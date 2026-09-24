@@ -26,6 +26,13 @@ CREATE TABLE IF NOT EXISTS settings (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS bookmarks (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	book_id TEXT NOT NULL,
+	seq INTEGER NOT NULL,
+	created_at INTEGER NOT NULL DEFAULT 0,
+	UNIQUE (book_id, seq)
+);
 """
 
 var _db: SQLite
@@ -126,7 +133,9 @@ func get_books() -> Array[Dictionary]:
 	if _db == null:
 		return out
 	if not _db.query(
-		"SELECT id, title, author, cover, paragraph_count, imported_at FROM books ORDER BY imported_at DESC;"
+		"""SELECT id, title, author, cover, paragraph_count, imported_at,
+		(SELECT count(*) FROM bookmarks WHERE bookmarks.book_id = books.id) AS bookmark_count
+		FROM books ORDER BY imported_at DESC;"""
 	):
 		push_error("Db.get_books: %s" % _db.error_message)
 		return out
@@ -147,6 +156,7 @@ func _normalize_book(row: Dictionary) -> Dictionary:
 		"cover": cover,
 		"paragraph_count": int(row.get("paragraph_count", 0)),
 		"imported_at": int(row.get("imported_at", 0)),
+		"bookmark_count": int(row.get("bookmark_count", 0)),
 	}
 
 
@@ -192,6 +202,64 @@ func seq_key(book_id: String) -> String:
 	return "last_seq:" + book_id
 
 
+## True if the paragraph (seq within the book) is bookmarked.
+func is_bookmarked(book_id: String, seq: int) -> bool:
+	if _db == null:
+		return false
+	if not _db.query_with_bindings(
+		"SELECT 1 FROM bookmarks WHERE book_id = ? AND seq = ? LIMIT 1;",
+		[book_id, seq]
+	):
+		push_error("Db.is_bookmarked: %s" % _db.error_message)
+		return false
+	return not (_db.query_result as Array).is_empty()
+
+
+## Adds the bookmark if missing, removes it if present.
+## Returns true if the paragraph is bookmarked now.
+func toggle_bookmark(book_id: String, seq: int) -> bool:
+	if _db == null:
+		push_error("Db.toggle_bookmark: no connection")
+		return false
+	if is_bookmarked(book_id, seq):
+		if not _db.query_with_bindings(
+			"DELETE FROM bookmarks WHERE book_id = ? AND seq = ?;", [book_id, seq]
+		):
+			push_error("Db.toggle_bookmark: %s" % _db.error_message)
+			return false
+		return false
+	if not _db.query_with_bindings(
+		"INSERT INTO bookmarks (book_id, seq, created_at) VALUES (?, ?, ?);",
+		[book_id, seq, int(Time.get_unix_time_from_system())]
+	):
+		push_error("Db.toggle_bookmark: %s" % _db.error_message)
+		return false
+	return true
+
+
+## Bookmarked paragraphs of one book in reading order
+## (same shape as get_paragraphs: [{seq, chapter, text}, ...]).
+func get_bookmarked_paragraphs(book_id: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _db == null:
+		return out
+	if not _db.query_with_bindings(
+		"""SELECT p.seq, p.chapter, p.text FROM paragraphs p
+		JOIN bookmarks b ON b.book_id = p.book_id AND b.seq = p.seq
+		WHERE p.book_id = ? ORDER BY p.seq ASC;""",
+		[book_id]
+	):
+		push_error("Db.get_bookmarked_paragraphs: %s" % _db.error_message)
+		return out
+	for row: Dictionary in _db.query_result:
+		out.append({
+			"seq": int(row.get("seq", 0)),
+			"chapter": str(row.get("chapter", "")),
+			"text": str(row.get("text", "")),
+		})
+	return out
+
+
 ## Marks the book as just opened: moves it to the top of the list
 ## (get_books orders by imported_at DESC — also used as "last opened").
 func touch_book(book_id: String) -> bool:
@@ -207,7 +275,7 @@ func touch_book(book_id: String) -> bool:
 	return ok
 
 
-## Deletes the book and all its content (paragraphs, position, last read).
+## Deletes the book and all its content (paragraphs, bookmarks, position).
 func delete_book(book_id: String) -> bool:
 	if _db == null:
 		push_error("Db.delete_book: no connection")
@@ -217,6 +285,7 @@ func delete_book(book_id: String) -> bool:
 		return false
 	var ok := true
 	ok = ok and _db.query_with_bindings("DELETE FROM paragraphs WHERE book_id = ?;", [book_id])
+	ok = ok and _db.query_with_bindings("DELETE FROM bookmarks WHERE book_id = ?;", [book_id])
 	ok = ok and _db.query_with_bindings("DELETE FROM books WHERE id = ?;", [book_id])
 	ok = ok and _db.query_with_bindings(
 		"""DELETE FROM settings WHERE "key" = ?;""", [seq_key(book_id)]

@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://bde8ohbhflxb6"]
+[gd_scene load_steps=2 format=3 uid="uid://bde8ohbhflxb6"]
 
 [ext_resource type="Script" uid="uid://ddheyuha1g06g" path="res://ui/library/library_item.gd" id="1_item"]
 
@@ -56,6 +56,39 @@ mouse_default_cursor_shape = 1
 theme_override_colors/font_color = Color(1, 1, 1, 0.9)
 theme_override_font_sizes/font_size = 22
 text = "✕"
+flat = true
+
+[node name="StarBg" type="ColorRect" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -84.0
+offset_top = 4.0
+offset_right = -44.0
+offset_bottom = 48.0
+grow_horizontal = 0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.45)
+
+[node name="StarButton" type="Button" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -84.0
+offset_top = 4.0
+offset_right = -44.0
+offset_bottom = 48.0
+grow_horizontal = 0
+mouse_default_cursor_shape = 1
+theme_override_colors/font_color = Color(1, 0.84, 0.2, 1)
+theme_override_font_sizes/font_size = 22
+text = "★"
 flat = true
 
 [node name="TitleLabel" type="Label" parent="." unique_id=189289960]

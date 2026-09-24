@@ -16,8 +16,10 @@ const WHEEL_STEP := 80.0         # px per wheel step
 const TAP_MAX_MOVE := 15.0       # max movement for a gesture to count as a tap
 const DOUBLE_TAP_MS := 300       # double-tap window
 const MULTI_JUMP := 10           # paragraphs skipped by the two-finger gesture
+const MULTI_JUMP_ENABLED := false  # two-finger swipe jump: code kept, disabled
 const HOLD_MS := 450             # still press to trigger auto-scroll
 const AUTO_SCROLL_SPEED := 40.0  # px/s of auto-scroll (hold)
+const PINCH_THRESHOLD := 60.0    # px of finger-distance change to fire a pinch
 
 @onready var _cover_bg: TextureRect = %CoverBg
 @onready var _panel_a: Control = %TextPanelA
@@ -31,6 +33,18 @@ const AUTO_SCROLL_SPEED := 40.0  # px/s of auto-scroll (hold)
 var _book: Dictionary = {}
 var _paragraphs: Array[Dictionary] = []
 var _seq: int = 0
+
+# Bookmark browsing + peek (pinch-open shows context without moving last_seq).
+var _bookmark_mode := false
+var _peek := false
+var _bookmark_paragraphs: Array[Dictionary] = []
+var _all_paragraphs: Array[Dictionary] = []
+var _bookmark_return_seq := 0
+
+# Pinch state: per-finger positions (index → pos) for distance tracking.
+var _finger_pos: Dictionary = {}
+var _pinch_base_dist := 0.0
+var _pinch_consumed := false
 
 var _cover_cached: ImageTexture = null
 var _cover_book_id := ""
@@ -64,6 +78,10 @@ func setup(book: Dictionary, paragraphs: Array[Dictionary]) -> void:
 	_paragraphs = paragraphs
 	_feed_mode = false
 	_feed_last_id = -1
+	_bookmark_mode = false
+	_peek = false
+	_bookmark_paragraphs.clear()
+	_all_paragraphs = paragraphs
 	if _paragraphs.is_empty():
 		push_error("reader.setup: no paragraphs for the book")
 		return
@@ -85,8 +103,54 @@ func setup_feed(row: Dictionary) -> void:
 	_paragraphs = [row] as Array[Dictionary]
 	_feed_mode = true
 	_feed_last_id = int(row.get("id", -1))
+	_bookmark_mode = false
+	_peek = false
+	_bookmark_paragraphs.clear()
+	_all_paragraphs.clear()
 	_reset_panels()
 	_seq = 0
+	_render_current()
+
+
+## Bookmark browsing (star on a library cover): only the starred paragraphs
+## of one book. No last_seq writes; pinch-open peeks into the full book.
+func setup_bookmarks(
+	book: Dictionary, bookmarks: Array[Dictionary], all: Array[Dictionary]
+) -> void:
+	_book = book
+	_paragraphs = bookmarks
+	_bookmark_paragraphs = bookmarks
+	_all_paragraphs = all
+	_feed_mode = false
+	_feed_last_id = -1
+	_bookmark_mode = true
+	_peek = false
+	if _paragraphs.is_empty():
+		push_error("reader.setup_bookmarks: no bookmarks")
+		return
+	_reset_panels()
+	_seq = 0
+	_render_current()
+
+
+## Android back / Escape: consume only while peeking (return to the
+## bookmark list); otherwise let the caller exit the reader.
+func handle_back() -> bool:
+	if _peek:
+		_exit_peek()
+		return true
+	return false
+
+
+func _exit_peek() -> void:
+	_peek = false
+	_paragraphs = _bookmark_paragraphs
+	if _paragraphs.is_empty():
+		library_requested.emit()
+		return
+	_seq = clampi(_bookmark_return_seq, 0, _paragraphs.size() - 1)
+	_bookmark_mode = true
+	_reset_panels()
 	_render_current()
 
 
@@ -118,7 +182,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		exit_requested.emit()
+		if not handle_back():
+			exit_requested.emit()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -127,8 +192,10 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_touch_count += 1
+			_finger_pos[event.index] = event.position
 		else:
 			_touch_count = maxi(0, _touch_count - 1)
+			_finger_pos.erase(event.index)
 
 	# Release during the tween (handoff in progress): reset drag/hold state.
 	if _is_animating():
@@ -151,9 +218,11 @@ func _gui_input(event: InputEvent) -> void:
 			else:
 				_finish_drag(event.position)
 	elif event is InputEventScreenDrag:
+		_finger_pos[event.index] = event.position
 		if _multi_gesture:
 			# Both fingers contribute: two parallel fingers ≈ doubled dx.
 			_multi_dx += event.relative.x
+			_update_pinch()
 		elif _dragging:
 			_update_drag(event.position)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -177,6 +246,8 @@ func _enter_multi() -> void:
 		return
 	_multi_gesture = true
 	_multi_dx = 0.0
+	_pinch_consumed = false
+	_pinch_base_dist = _pinch_distance()
 	_hold_cancel()
 	if _dragging:
 		_dragging = false
@@ -190,8 +261,80 @@ func _finish_multi() -> void:
 	var dx := _multi_dx
 	_multi_gesture = false
 	_multi_dx = 0.0
+	if not MULTI_JUMP_ENABLED:
+		return
 	if absf(dx) >= SWIPE_THRESHOLD:
 		_jump(-1 if dx < 0.0 else 1)
+
+
+## Distance between the two tracked fingers; -1 if not exactly two.
+func _pinch_distance() -> float:
+	if _finger_pos.size() != 2:
+		return -1.0
+	var pts := _finger_pos.values()
+	return (pts[0] as Vector2).distance_to(pts[1] as Vector2)
+
+
+## Live pinch check during a two-finger drag: first threshold wins,
+## the gesture is then consumed (no further pinch, multi-jump skipped).
+func _update_pinch() -> void:
+	if _pinch_consumed or _pinch_base_dist <= 0.0:
+		return
+	var dist := _pinch_distance()
+	if dist < 0.0:
+		return
+	var delta := dist - _pinch_base_dist
+	if delta <= -PINCH_THRESHOLD:
+		_pinch_consumed = true
+		_on_pinch_close()
+	elif delta >= PINCH_THRESHOLD:
+		_pinch_consumed = true
+		_on_pinch_open()
+
+
+## Pinch closed (fingers together): toggle a bookmark on the current
+## paragraph. Not in feed mode; in bookmark mode it leaves the list.
+func _on_pinch_close() -> void:
+	if _feed_mode or _paragraphs.is_empty() or _book.is_empty():
+		return
+	var book_id := str(_book.get("id", ""))
+	if book_id.is_empty():
+		return
+	var db_seq := int(_paragraphs[_seq].get("seq", -1))
+	if db_seq < 0:
+		return
+	var now_on := Db.toggle_bookmark(book_id, db_seq)
+	if not now_on and _bookmark_mode:
+		# Removed the bookmark we were browsing: rebuild the list.
+		var list := Db.get_bookmarked_paragraphs(book_id)
+		if list.is_empty():
+			library_requested.emit()
+			return
+		_bookmark_paragraphs = list
+		_paragraphs = list
+		_seq = clampi(_seq, 0, _paragraphs.size() - 1)
+	_render_current()  # refresh ★ (no last_seq write while peek/bookmark)
+
+
+## Pinch open (fingers apart) while browsing bookmarks: show the paragraph
+## inside the full book WITHOUT touching the saved reading position.
+func _on_pinch_open() -> void:
+	if not _bookmark_mode or _paragraphs.is_empty() or _all_paragraphs.is_empty():
+		return
+	var want := int(_paragraphs[_seq].get("seq", -1))
+	var idx := -1
+	for i: int in _all_paragraphs.size():
+		if int(_all_paragraphs[i].get("seq", -1)) == want:
+			idx = i
+			break
+	if idx < 0:
+		return
+	_bookmark_return_seq = _seq
+	_paragraphs = _all_paragraphs
+	_seq = idx
+	_bookmark_mode = false
+	_peek = true
+	_render_current()
 
 
 ## Jump of MULTI_JUMP paragraphs with clamp (never snaps at the edges).
@@ -450,6 +593,7 @@ func _commit(target: int, dir: int) -> void:
 func _on_commit_finished(target: int) -> void:
 	_tween = null
 	_seq = target
+	_peek = false  # navigating away from a peek resumes position tracking
 	var swap_panel := _active_panel
 	_active_panel = _idle_panel
 	_idle_panel = swap_panel
@@ -488,12 +632,24 @@ func _render_current() -> void:
 		}
 		_update_cover()
 		return
-	_chapter_label.text = str(row["chapter"]).get_file().get_basename()
+	var book_id := str(_book.get("id", ""))
+	var chapter := str(row["chapter"]).get_file().get_basename()
+	if _bookmark_mode:
+		# Browsing bookmarks: ★ always on, counter = list position,
+		# no progress bar and no last_seq write.
+		_chapter_label.text = chapter + " ★"
+		_counter_label.text = "%d / %d" % [_seq + 1, _paragraphs.size()]
+		_progress_bar.visible = false
+		return
+	if not book_id.is_empty() and Db.is_bookmarked(book_id, int(row.get("seq", -1))):
+		chapter += " ★"
+	_chapter_label.text = chapter
 	_counter_label.text = "%d / %d" % [_seq + 1, _paragraphs.size()]
 	_progress_bar.visible = true
 	_progress_bar.max_value = _paragraphs.size()
 	_progress_bar.value = _seq + 1
-	Db.set_setting(Db.seq_key(str(_book.get("id", ""))), str(_seq))
+	if not _peek:
+		Db.set_setting(Db.seq_key(book_id), str(_seq))
 
 
 ## Label height = full content; scroll zeroed (text at top).

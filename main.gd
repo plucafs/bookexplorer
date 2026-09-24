@@ -20,6 +20,7 @@ func _ready() -> void:
 	_library.open_epub_requested.connect(_open_picker)
 	_library.book_selected.connect(_on_book_selected)
 	_library.feed_requested.connect(_on_feed_requested)
+	_library.bookmarks_requested.connect(_on_bookmarks_requested)
 	_confirmation.open_epub_requested.connect(_open_picker)
 	_confirmation.read_requested.connect(_on_read_requested)
 	_confirmation.library_requested.connect(_on_library_requested)
@@ -34,10 +35,12 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		# Android back: from the reader return to the source screen,
-		# from confirmation to the library; anywhere else, quit.
+		# Android back: from the reader return to the source screen
+		# (peek → bookmark list first), from confirmation to the library;
+		# anywhere else, quit.
 		if _reader.visible:
-			_on_reader_exit()
+			if not _reader.handle_back():
+				_on_reader_exit()
 		elif _confirmation.visible and not Db.get_books().is_empty():
 			_on_library_requested()
 		else:
@@ -63,6 +66,25 @@ func _set_screen(screen: Control) -> void:
 
 func _on_book_selected(book_id: String) -> void:
 	_open_reader(book_id, _library)
+
+
+## Star on a library cover: browse the book's bookmarks in the reader.
+func _on_bookmarks_requested(book_id: String) -> void:
+	var book := Db.get_book(book_id)
+	if book.is_empty():
+		push_error("main: book '%s' not found for bookmarks" % book_id)
+		return
+	var bookmarks := Db.get_bookmarked_paragraphs(book_id)
+	if bookmarks.is_empty():
+		return  # the star is hidden at 0; defensive
+	var all := Db.get_paragraphs(book_id)
+	if all.is_empty():
+		push_error("main: no paragraphs for '%s'" % book_id)
+		return
+	Db.touch_book(book_id)
+	_reader_return = _library
+	_reader.setup_bookmarks(book, bookmarks, all)
+	_set_screen(_reader)
 
 
 ## "Feed" button: random paragraph from all books.

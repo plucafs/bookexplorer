@@ -30,15 +30,19 @@ main.gd + main.tscn           state switch: Empty → Importing → Confirmation
 
 ```sql
 books(id TEXT PRIMARY KEY /*dc:identifier, fallback filename hash*/, title, author,
-	  cover BLOB, paragraph_count INT, imported_at INT);  -- imported_at = import OR last open
+      cover BLOB, paragraph_count INT, imported_at INT);  -- imported_at = import OR last open
 paragraphs(id INTEGER PK AUTOINCREMENT, book_id, seq INT, chapter, text);
 settings(key TEXT PK, value TEXT);  -- last_book_id
+bookmarks(id INTEGER PK AUTOINCREMENT, book_id, seq INT, created_at INT, UNIQUE(book_id, seq));
 ```
 
 Addon: `addons/godot-sqlite` (GDExtension, class `SQLite`: `open_db`, `query`, `query_with_bindings`, `query_result`).
 BLOB (cover): MANDATORY to use `query_with_bindings` with `PackedByteArray`.
-Db API: `get_books()` (ORDER BY imported_at DESC), `touch_book(id)` (opened → first),
-`get_random_paragraph(exclude_id)` (JOIN books, for the feed), `delete_book(id)` (transaction).
+Db API: `get_books()` (ORDER BY imported_at DESC, includes `bookmark_count` via correlated
+subquery), `touch_book(id)` (opened → first), `get_random_paragraph(exclude_id)` (JOIN books,
+for the feed), `delete_book(id)` (transaction, cascades bookmarks),
+`toggle_bookmark(book_id, seq) -> bool` (add/remove, returns new state),
+`is_bookmarked(book_id, seq)`, `get_bookmarked_paragraphs(book_id)` (JOIN paragraphs, ORDER BY seq).
 
 ### Import pipeline (EpubImporter)
 
@@ -58,6 +62,8 @@ Db API: `get_books()` (ORDER BY imported_at DESC), `touch_book(id)` (opened → 
   `library_item.tscn` for each book **in `get_books()` order** (the last opened with
   `Db.touch_book` is first, on the left), size `STRIP_ITEM_SIZE` (170×260),
   **delete X visible on all**, tap (`pressed`) → `book_selected` → Reader.
+  **Star (`★`, next to the X)**: `visible = bookmark_count > 0`, emits
+  `bookmarks_requested(book_id)` → main → `reader.setup_bookmarks(book, bookmarks, all)`.
   **Drag on the covers scrolls the row** (custom `gui_input` per item, absolute
   model in global coords, threshold `STRIP_DRAG_THRESHOLD`=8px; a release after
   a drag is swallowed and does not open).
@@ -119,12 +125,32 @@ Db API: `get_books()` (ORDER BY imported_at DESC), `touch_book(id)` (opened → 
   accumulates `relative.x` (both fingers); release under 2 fingers → `|dx| ≥ SWIPE_THRESHOLD`
   → `_jump(±1)` = **±10 paragraphs with clamp** (`clampi`, never snap at the edges).
   In feed `_jump` → `_feed_jump` (forward fetch / walk back up the history).
+  **DISABLED**: `_finish_multi` returns early when `MULTI_JUMP_ENABLED=false`
+  (code kept: `_jump`/`_feed_jump` intact; re-enable with one flag).
+- **Pinch** (`_finger_pos: Dictionary{index→pos}` on ScreenTouch/ScreenDrag,
+  exactly 2 fingers): `_enter_multi` records `_pinch_base_dist`; during multi-drag
+  `_update_pinch` fires when distance changes ≥ `PINCH_THRESHOLD` (60px), sets
+  `_pinch_consumed` (gesture eaten once). **Pinch closed** → `Db.toggle_bookmark`
+  on the current paragraph (not in feed mode) + ` ★` feedback on the chapter label;
+  in bookmark mode a removal rebuilds the list (empty → library). **Pinch open**
+  → only in bookmark mode: peek into `_all_paragraphs` at that seq
+  (`_peek=true`, `_bookmark_mode=false`, `_bookmark_return_seq` saved).
+- **Bookmark mode** (`setup_bookmarks(book, bookmarks, all)`): `_paragraphs` =
+  bookmark list, counter `i / N`, chapter label = chapter + ` ★`, progress bar hidden,
+  **no `last_seq` write**; navigation clamps to the list (snap at edges).
+- **Peek** (`_peek`): renders the full book at the bookmark WITHOUT writing
+  `last_seq` (same guard style as feed); any `_commit` clears `_peek` and saves
+  normally from then on. `handle_back()` → true while peeking: returns to the
+  bookmark list (`_exit_peek`); main.gd GO_BACK and Escape call it first.
+  Double tap still goes to the library.
 - **Feed mode** (`setup_feed(row)`): `_paragraphs` = growing feed history,
   `_seq` = position; at end of history `_go(+1)` runs `_fetch_feed_row()`
   (`Db.get_random_paragraph(exclude last_id)`, max 3 attempts). Dedicated render:
   chapter label = **book title** of the paragraph, counter = steps taken,
   progress bar hidden, **no `last_seq` write**, cover updated from the
   row (`book_id`+`cover`). Exit: back/double tap → library (`_reader_return`).
+- Bookmark entry from the star: `_reader_return = _library`, `touch_book` runs,
+  `last_seq` untouched until the user navigates normally.
 - Paragraph view (`ui/paragraph_view/`): **disconnected** — no reference in reader/main.
 - Animation: `create_tween().bind_node(self)`, `TRANS_CUBIC + EASE_OUT`, 0.28s, A/B panels swap
   roles; input blocked during the tween (`_kill_tween`); a release during the tween

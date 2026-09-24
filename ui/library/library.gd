@@ -7,6 +7,7 @@ extends Control
 signal open_epub_requested
 signal book_selected(book_id: String)
 signal feed_requested
+signal bookmarks_requested(book_id: String)
 
 const ITEM_SCENE := preload("res://ui/library/library_item.tscn")
 
@@ -74,6 +75,9 @@ func _ready() -> void:
 	_book_left.delete_requested.connect(_on_delete_button_pressed.bind(_book_left))
 	_book_center.delete_requested.connect(_on_delete_button_pressed.bind(_book_center))
 	_book_right.delete_requested.connect(_on_delete_button_pressed.bind(_book_right))
+	_book_left.bookmarks_requested.connect(_on_carousel_bookmarks_pressed.bind(_book_left))
+	_book_center.bookmarks_requested.connect(_on_carousel_bookmarks_pressed.bind(_book_center))
+	_book_right.bookmarks_requested.connect(_on_carousel_bookmarks_pressed.bind(_book_right))
 	_compute_slots()
 	_carousel.gui_input.connect(_on_carousel_input)
 
@@ -182,6 +186,7 @@ func _setup_node(node: Button, index: int, is_center: bool) -> void:
 	node.visible = true
 	node.setup(_books[index])
 	node.set_delete_enabled(is_center)
+	node.set_star_visible(int(_books[index].get("bookmark_count", 0)) > 0)
 	# Size per role: nodes rotate, the role (not the node) defines the box.
 	var box := CENTER_SIZE if is_center else SIDE_SIZE
 	node.custom_minimum_size = box
@@ -203,10 +208,12 @@ func _render_strip() -> void:
 		item.pressed.connect(_on_strip_item_pressed.bind(book_id))
 		item.gui_input.connect(_on_strip_item_gui_input.bind(item))
 		item.delete_requested.connect(_on_delete_requested.bind(book_id))
+		item.bookmarks_requested.connect(_on_strip_bookmarks_requested.bind(book_id))
 		_book_row.add_child(item)  # add_child first: setup uses the @onready vars
 		item.custom_minimum_size = STRIP_ITEM_SIZE
 		item.setup(book)
 		item.set_delete_enabled(true)  # X visible on every book in the row
+		item.set_star_visible(int(book.get("bookmark_count", 0)) > 0)
 
 
 func _on_strip_item_pressed(book_id: String) -> void:
@@ -216,6 +223,16 @@ func _on_strip_item_pressed(book_id: String) -> void:
 		_strip_drag_moved = false
 		return
 	book_selected.emit(book_id)
+
+
+func _on_strip_bookmarks_requested(book_id: String) -> void:
+	bookmarks_requested.emit(book_id)
+
+
+func _on_carousel_bookmarks_pressed(node: Button) -> void:
+	var idx := _index_of_node(node)
+	if idx >= 0:
+		bookmarks_requested.emit(str(_books[idx]["id"]))
 
 
 ## Drag on a strip item scrolls the row horizontally.
