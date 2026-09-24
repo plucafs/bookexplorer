@@ -1,0 +1,93 @@
+[gd_scene format=3 uid="uid://cqlw0bpx03hfm"]
+
+[ext_resource type="Script" uid="uid://bw5g7hse1xm06" path="res://ui/toc/toc.gd" id="1_toc"]
+
+[node name="Toc" type="Control" unique_id=213129947]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_toc")
+
+[node name="Dim" type="ColorRect" parent="." unique_id=1718041992]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.85)
+
+[node name="Panel" type="MarginContainer" parent="." unique_id=625536993]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 56
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="Panel" unique_id=1972668776]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="Panel/VBox" unique_id=1782597869]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox/Header" unique_id=63992116]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Contents"
+vertical_alignment = 1
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/VBox" unique_id=2096381125]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="List" type="VBoxContainer" parent="Panel/VBox/Scroll" unique_id=1550918732]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/VBox" unique_id=139706692]
+layout_mode = 2
+
+[node name="Search" type="LineEdit" parent="Panel/VBox/VBoxContainer" unique_id=435782757]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+placeholder_text = "Search chapters…"
+
+[node name="SaveToggleButton" type="Button" parent="Panel/VBox/VBoxContainer" unique_id=266108094]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Save position: ON"
+
+[node name="CloseButton" type="Button" parent="Panel/VBox/VBoxContainer" unique_id=801128986]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "✕"
+
+[node name="ReturnButton" type="Button" parent="Panel/VBox/VBoxContainer" unique_id=1353887357]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 15

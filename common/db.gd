@@ -260,6 +260,27 @@ func get_bookmarked_paragraphs(book_id: String) -> Array[Dictionary]:
 	return out
 
 
+## Table of contents: one entry per distinct chapter with the seq of its
+## first paragraph, in reading order: [{chapter, seq}, ...].
+func get_toc(book_id: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _db == null:
+		return out
+	if not _db.query_with_bindings(
+		"""SELECT chapter, MIN(seq) AS seq FROM paragraphs
+		WHERE book_id = ? GROUP BY chapter ORDER BY MIN(seq) ASC;""",
+		[book_id]
+	):
+		push_error("Db.get_toc: %s" % _db.error_message)
+		return out
+	for row: Dictionary in _db.query_result:
+		out.append({
+			"chapter": str(row.get("chapter", "")),
+			"seq": int(row.get("seq", 0)),
+		})
+	return out
+
+
 ## Marks the book as just opened: moves it to the top of the list
 ## (get_books orders by imported_at DESC — also used as "last opened").
 func touch_book(book_id: String) -> bool:

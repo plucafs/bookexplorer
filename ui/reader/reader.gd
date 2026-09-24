@@ -29,6 +29,9 @@ const PINCH_THRESHOLD := 60.0    # px of finger-distance change to fire a pinch
 @onready var _chapter_label: Label = %ChapterLabel
 @onready var _counter_label: Label = %CounterLabel
 @onready var _progress_bar: ProgressBar = %ProgressBar
+@onready var _toc: TocPanel = %Toc
+@onready var _toc_bar_button: Button = %TocBarButton
+@onready var _counter_bar_button: Button = %CounterBarButton
 
 var _book: Dictionary = {}
 var _paragraphs: Array[Dictionary] = []
@@ -45,6 +48,14 @@ var _bookmark_return_seq := 0
 var _finger_pos: Dictionary = {}
 var _pinch_base_dist := 0.0
 var _pinch_consumed := false
+
+# Session-only no-save mode (toggle in the TOC header; resets on setup*).
+var _no_save := false
+
+# TOC return point: captured on the first TOC open of the session.
+var _toc_return_seq := -1        # global seq of the book, -1 = none
+var _toc_return_mode := 0        # 0 = normal book, 1 = bookmark list
+var _toc_return_list_index := 0  # bookmark-list index when mode = 1
 
 var _cover_cached: ImageTexture = null
 var _cover_book_id := ""
@@ -72,6 +83,116 @@ var _hold_armed := false        # auto-scroll running
 var _hold_consumed := false     # the hold fired: release is not a tap
 
 
+func _ready() -> void:
+	_toc_bar_button.pressed.connect(_open_toc)
+	_counter_bar_button.pressed.connect(_open_toc)
+	_toc.chapter_selected.connect(_jump_to_seq)
+	_toc.close_requested.connect(_toc.close)
+	_toc.return_requested.connect(_on_toc_return)
+	_toc.save_toggle_requested.connect(_on_save_toggle)
+
+
+## New reader session: no-save off, no return point, counter normal.
+func _reset_session_state() -> void:
+	_no_save = false
+	_toc_return_seq = -1
+	_toc_return_mode = 0
+	_counter_label.modulate = Color.WHITE
+
+
+## Top chapter bar and bottom counter open the table of contents.
+func _open_toc() -> void:
+	if _book.is_empty() or _paragraphs.is_empty():
+		return
+	var entries := Db.get_toc(str(_book.get("id", "")))
+	if entries.is_empty():
+		return
+	var current := int(_paragraphs[_seq].get("seq", -1))
+	# First open of the session captures the return point (not from feed).
+	if _toc_return_seq < 0 and not _feed_mode:
+		_toc_return_seq = current
+		if _bookmark_mode or (_peek and not _bookmark_paragraphs.is_empty()):
+			_toc_return_mode = 1
+			_toc_return_list_index = _seq if _bookmark_mode else _bookmark_return_seq
+		else:
+			_toc_return_mode = 0
+	var return_text := ""
+	if _toc_return_seq >= 0 and _toc_return_seq != current:
+		return_text = _return_label(_toc_return_seq)
+	_toc.open(entries, current, return_text, not _no_save)
+
+
+## "↩ Back to <chapter> (¶n)" for the return button; chapter if known.
+func _return_label(seq: int) -> String:
+	var rows := _all_paragraphs if not _all_paragraphs.is_empty() else _paragraphs
+	for row: Dictionary in rows:
+		if int(row.get("seq", -1)) == seq:
+			var chapter := str(row.get("chapter", "")).get_file().get_basename()
+			if chapter.is_empty():
+				break
+			return "↩ Back to \"%s\" (¶%d)" % [chapter, seq + 1]
+	return "↩ Back to paragraph %d" % (seq + 1)
+
+
+## Return button: jump back to the captured position/mode and clear it.
+func _on_toc_return() -> void:
+	var seq := _toc_return_seq
+	var mode := _toc_return_mode
+	var list_index := _toc_return_list_index
+	_toc_return_seq = -1
+	_toc.close()
+	if seq < 0:
+		return
+	if mode == 1 and not _bookmark_paragraphs.is_empty():
+		_paragraphs = _bookmark_paragraphs
+		_seq = clampi(list_index, 0, _paragraphs.size() - 1)
+		_bookmark_mode = true
+		_peek = false
+		_reset_panels()
+		_render_current()
+		return
+	_jump_to_seq(seq)
+
+
+## Save: ON/OFF toggle (session-only). Amber counter while saving is off.
+func _on_save_toggle() -> void:
+	_no_save = not _no_save
+	_toc.set_save_state(not _no_save)
+	_counter_label.modulate = Color(1.0, 0.84, 0.2, 1.0) if _no_save else Color.WHITE
+
+
+## TOC entry tapped: jump to that chapter.
+## Normal/peek: slide within the book (normal saves at finish, peek keeps
+## no-save). Feed/bookmark: switch to the book view as a peek (no last_seq).
+func _jump_to_seq(target: int) -> void:
+	_toc.close()
+	if _paragraphs.is_empty():
+		return
+	if _feed_mode or _bookmark_mode:
+		var book_id := str(_book.get("id", ""))
+		var all := _all_paragraphs
+		if all.is_empty():
+			all = Db.get_paragraphs(book_id)
+		if all.is_empty():
+			push_error("reader._jump_to_seq: no paragraphs for '%s'" % book_id)
+			return
+		if _bookmark_mode:
+			_bookmark_return_seq = _seq
+		_feed_mode = false
+		_bookmark_mode = false
+		_paragraphs = all
+		_all_paragraphs = all
+		_peek = true
+		_reset_panels()
+		_seq = clampi(target, 0, _paragraphs.size() - 1)
+		_render_current()
+		return
+	var t := clampi(target, 0, _paragraphs.size() - 1)
+	if t == _seq:
+		return
+	_commit(t, 1 if t > _seq else -1, _peek)
+
+
 ## Call from main.gd every time the reader is entered.
 func setup(book: Dictionary, paragraphs: Array[Dictionary]) -> void:
 	_book = book
@@ -82,6 +203,7 @@ func setup(book: Dictionary, paragraphs: Array[Dictionary]) -> void:
 	_peek = false
 	_bookmark_paragraphs.clear()
 	_all_paragraphs = paragraphs
+	_reset_session_state()
 	if _paragraphs.is_empty():
 		push_error("reader.setup: no paragraphs for the book")
 		return
@@ -107,6 +229,7 @@ func setup_feed(row: Dictionary) -> void:
 	_peek = false
 	_bookmark_paragraphs.clear()
 	_all_paragraphs.clear()
+	_reset_session_state()
 	_reset_panels()
 	_seq = 0
 	_render_current()
@@ -125,6 +248,7 @@ func setup_bookmarks(
 	_feed_last_id = -1
 	_bookmark_mode = true
 	_peek = false
+	_reset_session_state()
 	if _paragraphs.is_empty():
 		push_error("reader.setup_bookmarks: no bookmarks")
 		return
@@ -133,9 +257,12 @@ func setup_bookmarks(
 	_render_current()
 
 
-## Android back / Escape: consume only while peeking (return to the
-## bookmark list); otherwise let the caller exit the reader.
+## Android back / Escape: close the TOC first, then leave a peek (back to
+## the bookmark list); otherwise let the caller exit the reader.
 func handle_back() -> bool:
+	if _toc.is_open():
+		_toc.close()
+		return true
 	if _peek:
 		_exit_peek()
 		return true
@@ -572,7 +699,7 @@ func _feed_jump(amount: int) -> void:
 		_commit(t_back, -1)
 
 
-func _commit(target: int, dir: int) -> void:
+func _commit(target: int, dir: int, keep_peek: bool = false) -> void:
 	var h := size.y
 	_idle_text.text = str(_paragraphs[target]["text"])
 	_reset_label(_idle_text)  # full height + scroll at top
@@ -587,13 +714,14 @@ func _commit(target: int, dir: int) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_idle_panel, "position:y", 0.0, SLIDE_DURATION) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_tween.finished.connect(_on_commit_finished.bind(target))
+	_tween.finished.connect(_on_commit_finished.bind(target, keep_peek))
 
 
-func _on_commit_finished(target: int) -> void:
+func _on_commit_finished(target: int, keep_peek: bool = false) -> void:
 	_tween = null
 	_seq = target
-	_peek = false  # navigating away from a peek resumes position tracking
+	if not keep_peek:
+		_peek = false  # a normal swipe away from a peek resumes tracking
 	var swap_panel := _active_panel
 	_active_panel = _idle_panel
 	_idle_panel = swap_panel
@@ -648,7 +776,7 @@ func _render_current() -> void:
 	_progress_bar.visible = true
 	_progress_bar.max_value = _paragraphs.size()
 	_progress_bar.value = _seq + 1
-	if not _peek:
+	if not _peek and not _no_save:
 		Db.set_setting(Db.seq_key(book_id), str(_seq))
 
 

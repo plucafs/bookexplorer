@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[node name="TocItem" type="Button"]
+custom_minimum_size = Vector2(0, 56)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+alignment = 0

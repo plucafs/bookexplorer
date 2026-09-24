@@ -42,7 +42,8 @@ Db API: `get_books()` (ORDER BY imported_at DESC, includes `bookmark_count` via 
 subquery), `touch_book(id)` (opened → first), `get_random_paragraph(exclude_id)` (JOIN books,
 for the feed), `delete_book(id)` (transaction, cascades bookmarks),
 `toggle_bookmark(book_id, seq) -> bool` (add/remove, returns new state),
-`is_bookmarked(book_id, seq)`, `get_bookmarked_paragraphs(book_id)` (JOIN paragraphs, ORDER BY seq).
+`is_bookmarked(book_id, seq)`, `get_bookmarked_paragraphs(book_id)` (JOIN paragraphs, ORDER BY seq),
+`get_toc(book_id)` → `[{chapter, seq}]` (GROUP BY chapter, MIN(seq), reading order).
 
 ### Import pipeline (EpubImporter)
 
@@ -140,9 +141,40 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   **no `last_seq` write**; navigation clamps to the list (snap at edges).
 - **Peek** (`_peek`): renders the full book at the bookmark WITHOUT writing
   `last_seq` (same guard style as feed); any `_commit` clears `_peek` and saves
-  normally from then on. `handle_back()` → true while peeking: returns to the
-  bookmark list (`_exit_peek`); main.gd GO_BACK and Escape call it first.
-  Double tap still goes to the library.
+  normally from then on (`keep_peek=true` on `_commit` preserves it — used by
+  TOC jumps while peeking). `handle_back()` order: **1) TOC open → close**,
+  **2) peek → bookmark list** (`_exit_peek`), else false (caller exits);
+  main.gd GO_BACK and Escape call it first. Double tap still goes to library.
+- **TOC** (`ui/toc/toc.tscn`, `class_name TocPanel`, composed in `reader.tscn`
+  as last child, hidden): opened by **both** `%TocBarButton` (transparent,
+  top chapter bar y 0–80) and `%CounterBarButton` (bottom counter area,
+  −96…−16). Overlay `mouse_filter=STOP` blocks reader gestures.
+  Rows = `toc_item.tscn` buttons (56px, `chapter_selected(seq)`), current
+  chapter in gold; **LineEdit "Search chapters…"** at the bottom filters rows
+  case-insensitively. Empty chapter href displays as `—`.
+  **List drag-to-scroll** (items are Buttons: per-item `gui_input`, absolute
+  model in global coords, `DRAG_THRESHOLD`=8px; a release after a drag is
+  swallowed). **Pull-down dismiss** (`DISMISS_THRESHOLD`=80px down): on the
+  list when `scroll_vertical==0` at press, and on the **Dim** (the Panel
+  margins, incl. below the search, fall through to it; Dim tap = close on
+  release without movement, horizontal drag does not close).
+  **`SaveToggleButton`** (header, next to ✕): session-only no-save mode —
+  `save_toggle_requested` → `reader._no_save`; amber `_counter_label.modulate`
+  while active; `_render_current` guard `if not _peek and not _no_save`.
+  Reset by `_reset_session_state()` in all `setup*`.
+  **`ReturnButton`** (between list and search): first TOC open of the session
+  captures `_toc_return_seq/_toc_return_mode/_toc_return_list_index` (not from
+  feed); hidden if none or if you are already there; label
+  `↩ Back to "ch" (¶n)` via `_return_label`; `return_requested` → mode NORMAL
+  = `_jump_to_seq(seq)`, mode BOOKMARKS = restore `_bookmark_paragraphs` at
+  the captured index; then pending = -1.
+  `_open_toc()`: `Db.get_toc(_book.id)` (works in every mode), skipped if
+  entries empty. **`_jump_to_seq`**: normal/peek → slide
+  `_commit(target, ±dir, keep_peek=_peek)` (normal saves at finish unless
+  `_no_save`; peek keeps no-save); feed/bookmark → switch `_paragraphs` to
+  `_all_paragraphs` (load from DB if empty), clear feed/bookmark flags,
+  `_peek=true` (NO `last_seq` write — same rule as pinch-open; from bookmark
+  mode saves `_bookmark_return_seq`), instant `_reset_panels`+render.
 - **Feed mode** (`setup_feed(row)`): `_paragraphs` = growing feed history,
   `_seq` = position; at end of history `_go(+1)` runs `_fetch_feed_row()`
   (`Db.get_random_paragraph(exclude last_id)`, max 3 attempts). Dedicated render:

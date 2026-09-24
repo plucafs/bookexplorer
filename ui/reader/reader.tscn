@@ -1,13 +1,8 @@
 [gd_scene format=3 uid="uid://b6h8av8375nax"]
 
 [ext_resource type="Script" uid="uid://cqt7g3f5sl4mn" path="res://ui/reader/reader.gd" id="1_reader"]
-[ext_resource type="Shader" uid="uid://0fudeayb1b2c" path="res://ui/reader/cover_blur.gdshader" id="3_blur"]
 [ext_resource type="Theme" uid="uid://dlpcwhdihbx66" path="res://themes/reader_theme.tres" id="3_dj17l"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_y4ns5"]
-shader = ExtResource("3_blur")
-shader_parameter/blur_start = 0.15
-shader_parameter/max_lod = 6.0
+[ext_resource type="PackedScene" path="res://ui/toc/toc.tscn" id="4_toc"]
 
 [sub_resource type="Gradient" id="Gradient_dj17l"]
 offsets = PackedFloat32Array(0, 0.3125, 0.65625, 1)
@@ -28,19 +23,8 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_reader")
 
-[node name="Backdrop" type="ColorRect" parent="." unique_id=1134748760]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0, 0, 0, 1)
-
 [node name="CoverBg" type="TextureRect" parent="." unique_id=1565627623]
 unique_name_in_owner = true
-material = SubResource("ShaderMaterial_y4ns5")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -186,3 +170,31 @@ custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 mouse_filter = 2
 show_percentage = false
+
+[node name="TocBarButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 0.0
+offset_bottom = 80.0
+grow_horizontal = 2
+flat = true
+
+[node name="CounterBarButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = -96.0
+offset_right = 0.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+flat = true
+
+[node name="Toc" parent="." instance=ExtResource("4_toc")]
+unique_name_in_owner = true
