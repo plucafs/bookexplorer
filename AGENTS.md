@@ -58,6 +58,9 @@ Db API: `get_books()` (ORDER BY imported_at DESC), `touch_book(id)` (opened → 
   `library_item.tscn` for each book **in `get_books()` order** (the last opened with
   `Db.touch_book` is first, on the left), size `STRIP_ITEM_SIZE` (170×260),
   **delete X visible on all**, tap (`pressed`) → `book_selected` → Reader.
+  **Drag on the covers scrolls the row** (custom `gui_input` per item, absolute
+  model in global coords, threshold `STRIP_DRAG_THRESHOLD`=8px; a release after
+  a drag is swallowed and does not open).
   0 books → Strip hidden + `%EmptyLabel`. Scroll reset to 0 on every refresh.
 - **Carousel: KEPT BUT HIDDEN** (`%Carousel.visible=false`, same for SwipeHint):
   code intact (`_compute_slots`, `_swipe_to`, node rotation, tap hit-test…),

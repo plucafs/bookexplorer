@@ -18,6 +18,7 @@ const ALPHA_SIDE := 0.55
 const CENTER_SIZE := Vector2(260, 400)
 const SIDE_SIZE := Vector2(200, 310)
 const STRIP_ITEM_SIZE := Vector2(170, 260)  # item size in the bottom strip
+const STRIP_DRAG_THRESHOLD := 8.0  # px before a press on an item becomes a scroll drag
 const DELETE_INDEX := 0  # "Delete" button in the native dialog
 
 @onready var _open_button: Button = %OpenButton
@@ -55,6 +56,12 @@ var _drag_delta := Vector2.ZERO
 var _is_animating := false
 
 var _pending_delete_id := ""
+
+# Strip drag-to-scroll state (the items are Buttons: they swallow the events
+# the ScrollContainer would need, so we scroll it by hand).
+var _strip_drag_moved := false
+var _strip_drag_start := Vector2.ZERO  # global press position
+var _strip_drag_scroll0 := 0
 
 
 func _ready() -> void:
@@ -194,6 +201,7 @@ func _render_strip() -> void:
 		var item := ITEM_SCENE.instantiate() as Button
 		var book_id := str(book["id"])
 		item.pressed.connect(_on_strip_item_pressed.bind(book_id))
+		item.gui_input.connect(_on_strip_item_gui_input.bind(item))
 		item.delete_requested.connect(_on_delete_requested.bind(book_id))
 		_book_row.add_child(item)  # add_child first: setup uses the @onready vars
 		item.custom_minimum_size = STRIP_ITEM_SIZE
@@ -202,7 +210,31 @@ func _render_strip() -> void:
 
 
 func _on_strip_item_pressed(book_id: String) -> void:
+	# A release after a drag must not open the book (BaseButton emits
+	# pressed right after our gui_input handler on the release event).
+	if _strip_drag_moved:
+		_strip_drag_moved = false
+		return
 	book_selected.emit(book_id)
+
+
+## Drag on a strip item scrolls the row horizontally.
+## Positions are converted to GLOBAL space: the item origin moves while we
+## scroll, so local deltas would be eaten by the feedback (absolute model).
+func _on_strip_item_gui_input(event: InputEvent, item: Button) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_strip_drag_moved = false
+			_strip_drag_start = item.get_global_transform() * event.position
+			_strip_drag_scroll0 = _scroll.scroll_horizontal
+		# On release keep the flag: _on_strip_item_pressed swallows it.
+		return
+	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		var global_pos: Vector2 = item.get_global_transform() * event.position
+		var dx := global_pos.x - _strip_drag_start.x
+		if absf(dx) > STRIP_DRAG_THRESHOLD:
+			_strip_drag_moved = true
+			_scroll.scroll_horizontal = _strip_drag_scroll0 - int(dx)
 
 
 ## Carousel input: horizontal drag + tap.
