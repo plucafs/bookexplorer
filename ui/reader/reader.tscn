@@ -10,8 +10,8 @@ shader_parameter/blur_start = 0.15
 shader_parameter/max_lod = 6.0
 
 [sub_resource type="Gradient" id="Gradient_dj17l"]
-offsets = PackedFloat32Array(0, 0.65625, 1)
-colors = PackedColorArray(0, 0, 0, 0.5882353, 0.0059461705, 0.0059461724, 0.005946171, 0.54509807, 0, 0, 0, 0.23137255)
+offsets = PackedFloat32Array(0, 0.3125, 0.65625, 1)
+colors = PackedColorArray(0, 0, 0, 0.5882353, 0.0012673996, 0.0012673994, 0.0012673998, 1, 0.0059461705, 0.0059461724, 0.005946171, 0.54509807, 0, 0, 0, 0.23137255)
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_k5vtu"]
 gradient = SubResource("Gradient_dj17l")
