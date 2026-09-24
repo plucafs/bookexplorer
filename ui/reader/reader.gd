@@ -191,7 +191,7 @@ func _finish_multi() -> void:
 	_multi_gesture = false
 	_multi_dx = 0.0
 	if absf(dx) >= SWIPE_THRESHOLD:
-		_jump(1 if dx < 0.0 else -1)
+		_jump(-1 if dx < 0.0 else 1)
 
 
 ## Jump of MULTI_JUMP paragraphs with clamp (never snaps at the edges).
