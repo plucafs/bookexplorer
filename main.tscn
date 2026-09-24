@@ -1,0 +1,41 @@
+[gd_scene format=3 uid="uid://bns2ipjo1m00p"]
+
+[ext_resource type="Script" uid="uid://c63725xcpnoso" path="res://main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://ui/empty_state/empty_state.tscn" id="2_empty"]
+[ext_resource type="PackedScene" path="res://ui/importing/importing_overlay.tscn" id="3_import"]
+[ext_resource type="PackedScene" path="res://ui/confirmation/confirmation_screen.tscn" id="4_confirm"]
+[ext_resource type="PackedScene" uid="uid://b6h8av8375nax" path="res://ui/reader/reader.tscn" id="5_reader"]
+[ext_resource type="PackedScene" uid="uid://d36guyr0o13rd" path="res://ui/library/library.tscn" id="6_library"]
+
+[node name="Main" type="Control" unique_id=1417231404]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="EmptyState" parent="." unique_id=2058856172 instance=ExtResource("2_empty")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="ImportingOverlay" parent="." unique_id=698624439 instance=ExtResource("3_import")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="ConfirmationScreen" parent="." unique_id=1329603714 instance=ExtResource("4_confirm")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="Library" parent="." unique_id=88226554 instance=ExtResource("6_library")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="Reader" parent="." unique_id=1577678912 instance=ExtResource("5_reader")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1

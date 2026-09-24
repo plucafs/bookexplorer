@@ -1,0 +1,188 @@
+[gd_scene format=3 uid="uid://b6h8av8375nax"]
+
+[ext_resource type="Script" uid="uid://cqt7g3f5sl4mn" path="res://ui/reader/reader.gd" id="1_reader"]
+[ext_resource type="Shader" uid="uid://0fudeayb1b2c" path="res://ui/reader/cover_blur.gdshader" id="3_blur"]
+[ext_resource type="Theme" uid="uid://dlpcwhdihbx66" path="res://themes/reader_theme.tres" id="3_dj17l"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_y4ns5"]
+shader = ExtResource("3_blur")
+shader_parameter/blur_start = 0.15
+shader_parameter/max_lod = 6.0
+
+[sub_resource type="Gradient" id="Gradient_dj17l"]
+offsets = PackedFloat32Array(0, 0.65625, 1)
+colors = PackedColorArray(0, 0, 0, 0.5882353, 0.0059461705, 0.0059461724, 0.005946171, 0.54509807, 0, 0, 0, 0.23137255)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_k5vtu"]
+gradient = SubResource("Gradient_dj17l")
+fill_from = Vector2(0.5, 1)
+fill_to = Vector2(0.5, 0)
+metadata/_snap_enabled = true
+
+[node name="Reader" type="Control" unique_id=1995808848]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_reader")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=1134748760]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="CoverBg" type="TextureRect" parent="." unique_id=1565627623]
+unique_name_in_owner = true
+material = SubResource("ShaderMaterial_y4ns5")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 5
+stretch_mode = 4
+
+[node name="BgGradient" type="TextureRect" parent="." unique_id=1156868470]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("GradientTexture2D_k5vtu")
+
+[node name="Overlay" type="ColorRect" parent="." unique_id=1623639096]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.7137255)
+
+[node name="TextPanelA" type="Control" parent="." unique_id=1160949643]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TextViewport" type="Control" parent="TextPanelA" unique_id=108768363]
+clip_contents = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = 88.0
+offset_right = -32.0
+offset_bottom = -96.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TextLabelA" type="Label" parent="TextPanelA/TextViewport" unique_id=1764765694]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 23.0
+grow_horizontal = 2
+theme = ExtResource("3_dj17l")
+autowrap_mode = 3
+
+[node name="TextPanelB" type="Control" parent="." unique_id=551140971]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TextViewport" type="Control" parent="TextPanelB" unique_id=2022892645]
+clip_contents = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = 88.0
+offset_right = -32.0
+offset_bottom = -96.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TextLabelB" type="Label" parent="TextPanelB/TextViewport" unique_id=315902423]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 23.0
+grow_horizontal = 2
+theme = ExtResource("3_dj17l")
+autowrap_mode = 3
+
+[node name="ChapterLabel" type="Label" parent="." unique_id=1334677543]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 36.0
+offset_right = -24.0
+offset_bottom = 68.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+text_overrun_behavior = 3
+
+[node name="BottomMargin" type="MarginContainer" parent="." unique_id=1121083364]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -88.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="BottomVBox" type="VBoxContainer" parent="BottomMargin" unique_id=802269222]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="CounterLabel" type="Label" parent="BottomMargin/BottomVBox" unique_id=1877508031]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.7)
+theme_override_font_sizes/font_size = 15
+horizontal_alignment = 1
+
+[node name="ProgressBar" type="ProgressBar" parent="BottomMargin/BottomVBox" unique_id=1817881247]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+mouse_filter = 2
+show_percentage = false

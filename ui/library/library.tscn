@@ -1,0 +1,155 @@
+[gd_scene format=3 uid="uid://d36guyr0o13rd"]
+
+[ext_resource type="Script" uid="uid://bvwe27bwdj4tn" path="res://ui/library/library.gd" id="1_lib"]
+[ext_resource type="PackedScene" uid="uid://bde8ohbhflxb6" path="res://ui/library/library_item.tscn" id="2_item"]
+
+[node name="Library" type="Control" unique_id=417037583]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lib")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=476304703]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.14406255, 0.14406255, 0.14406255, 1)
+
+[node name="Header" type="HBoxContainer" parent="." unique_id=568026195]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 16.0
+offset_right = -24.0
+offset_bottom = 56.0
+grow_horizontal = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Header" unique_id=142098687]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 28
+text = "Library"
+vertical_alignment = 1
+
+[node name="FeedButton" type="Button" parent="Header" unique_id=1551072793]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Feed"
+
+[node name="OpenButton" type="Button" parent="Header" unique_id=462985646]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Open epub"
+
+[node name="EmptyLabel" type="Label" parent="." unique_id=2080409449]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+text = "No books yet. Tap \"Open epub\" to import one."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Carousel" type="Control" parent="." unique_id=847970862]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 64.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BookLeft" parent="Carousel" unique_id=1136847954 instance=ExtResource("2_item")]
+unique_name_in_owner = true
+layout_mode = 1
+offset_right = 200.0
+offset_bottom = 310.0
+mouse_filter = 2
+
+[node name="BookCenter" parent="Carousel" unique_id=1326265619 instance=ExtResource("2_item")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 400)
+layout_mode = 1
+offset_right = 260.0
+offset_bottom = 400.0
+mouse_filter = 2
+
+[node name="BookRight" parent="Carousel" unique_id=91782326 instance=ExtResource("2_item")]
+unique_name_in_owner = true
+layout_mode = 1
+offset_right = 200.0
+offset_bottom = 310.0
+mouse_filter = 2
+
+[node name="SwipeHint" type="Label" parent="." unique_id=167724862]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -100.0
+offset_top = -40.0
+offset_right = 100.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 0.8)
+theme_override_font_sizes/font_size = 14
+text = "← swipe →"
+horizontal_alignment = 1
+
+[node name="Strip" type="MarginContainer" parent="." unique_id=963699248]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -276.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/margin_left = 0
+theme_override_constants/margin_top = 0
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 0
+
+[node name="Scroll" type="ScrollContainer" parent="Strip" unique_id=630737524]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_scroll_mode = 2
+vertical_scroll_mode = 3
+
+[node name="BookRow" type="HBoxContainer" parent="Strip/Scroll" unique_id=509076629]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ConfirmDialog" type="ConfirmationDialog" parent="." unique_id=590836803]
+unique_name_in_owner = true
+title = "Delete book"
+ok_button_text = "Delete"
+cancel_button_text = "Cancel"

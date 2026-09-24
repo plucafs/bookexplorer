@@ -1,0 +1,79 @@
+[gd_scene format=3 uid="uid://cyuw6krasafba"]
+
+[ext_resource type="Script" uid="uid://cebmkycqciir1" path="res://ui/paragraph_view/paragraph_view.gd" id="1_pview"]
+
+[node name="ParagraphView" type="Control" unique_id=384113677]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_pview")
+
+[node name="Background" type="ColorRect" parent="." unique_id=30227501]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=2143901495]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 36
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 24
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=613748007]
+layout_mode = 2
+
+[node name="ChapterLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=872808304]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+text_overrun_behavior = 3
+
+[node name="TextMargin" type="MarginContainer" parent="MarginContainer/VBoxContainer" unique_id=854693636]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Scroll" type="ScrollContainer" parent="MarginContainer/VBoxContainer/TextMargin" unique_id=1640979507]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 0
+horizontal_scroll_mode = 0
+
+[node name="FullTextLabel" type="Label" parent="MarginContainer/VBoxContainer/TextMargin/Scroll" unique_id=852385527]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+autowrap_mode = 3
+
+[node name="CounterLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=1572555670]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.7)
+theme_override_font_sizes/font_size = 15
+horizontal_alignment = 1
+
+[node name="BackButton" type="Button" parent="MarginContainer/VBoxContainer" unique_id=1689268785]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+text = "Back"

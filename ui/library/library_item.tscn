@@ -1,0 +1,76 @@
+[gd_scene format=3 uid="uid://bde8ohbhflxb6"]
+
+[ext_resource type="Script" uid="uid://ddheyuha1g06g" path="res://ui/library/library_item.gd" id="1_item"]
+
+[node name="LibraryItem" type="Button" unique_id=902041341]
+custom_minimum_size = Vector2(200, 310)
+size_flags_horizontal = 3
+flat = true
+script = ExtResource("1_item")
+
+[node name="CoverPlaceholder" type="ColorRect" parent="." unique_id=485081301]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = -56.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.12, 0.12, 0.13, 1)
+
+[node name="CoverTexture" type="TextureRect" parent="." unique_id=61483360]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = -56.0
+grow_horizontal = 2
+mouse_filter = 2
+expand_mode = 4
+stretch_mode = 5
+
+[node name="DeleteBg" type="ColorRect" parent="." unique_id=1409379274]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -44.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = 48.0
+grow_horizontal = 0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.45)
+
+[node name="DeleteButton" type="Button" parent="." unique_id=698883453]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -44.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = 48.0
+grow_horizontal = 0
+mouse_default_cursor_shape = 1
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 22
+text = "✕"
+flat = true
+
+[node name="TitleLabel" type="Label" parent="." unique_id=189289960]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -52.0
+offset_bottom = -4.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 15
+horizontal_alignment = 1
+autowrap_mode = 3
+text_overrun_behavior = 4
+max_lines_visible = 2

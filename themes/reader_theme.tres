@@ -1,0 +1,7 @@
+[gd_resource type="Theme" format=3 uid="uid://dlpcwhdihbx66"]
+
+[ext_resource type="FontFile" uid="uid://cb5ipr2yxfno8" path="res://fonts/EB_Garamond/EBGaramond-VariableFont_wght.ttf" id="1_1h68f"]
+
+[resource]
+default_font = ExtResource("1_1h68f")
+default_font_size = 28
