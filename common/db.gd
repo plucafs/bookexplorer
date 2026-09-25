@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS bookmarks (
 	created_at INTEGER NOT NULL DEFAULT 0,
 	UNIQUE (book_id, seq)
 );
+CREATE TABLE IF NOT EXISTS toc_entries (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	book_id TEXT NOT NULL,
+	seq INTEGER NOT NULL,
+	title TEXT NOT NULL
+);
 """
 
 var _db: SQLite
@@ -260,12 +266,27 @@ func get_bookmarked_paragraphs(book_id: String) -> Array[Dictionary]:
 	return out
 
 
-## Table of contents: one entry per distinct chapter with the seq of its
-## first paragraph, in reading order: [{chapter, seq}, ...].
+## Table of contents: [{title, seq}] in reading order.
+## Titles come from the epub nav/NCX (toc_entries, imported); books imported
+## before that (or with no nav/NCX) fall back to chapter href basenames.
 func get_toc(book_id: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if _db == null:
 		return out
+	if not _db.query_with_bindings(
+		"SELECT seq, title FROM toc_entries WHERE book_id = ? ORDER BY seq ASC, id ASC;",
+		[book_id]
+	):
+		push_error("Db.get_toc: %s" % _db.error_message)
+		return out
+	if not (_db.query_result as Array).is_empty():
+		for row: Dictionary in _db.query_result:
+			out.append({
+				"title": str(row.get("title", "")),
+				"seq": int(row.get("seq", 0)),
+			})
+		return out
+	# Fallback: one entry per distinct chapter href, display-ready titles.
 	if not _db.query_with_bindings(
 		"""SELECT chapter, MIN(seq) AS seq FROM paragraphs
 		WHERE book_id = ? GROUP BY chapter ORDER BY MIN(seq) ASC;""",
@@ -274,8 +295,9 @@ func get_toc(book_id: String) -> Array[Dictionary]:
 		push_error("Db.get_toc: %s" % _db.error_message)
 		return out
 	for row: Dictionary in _db.query_result:
+		var title := str(row.get("chapter", "")).get_file().get_basename()
 		out.append({
-			"chapter": str(row.get("chapter", "")),
+			"title": title if not title.is_empty() else "—",
 			"seq": int(row.get("seq", 0)),
 		})
 	return out
@@ -296,7 +318,8 @@ func touch_book(book_id: String) -> bool:
 	return ok
 
 
-## Deletes the book and all its content (paragraphs, bookmarks, position).
+## Deletes the book and all its content
+## (paragraphs, bookmarks, toc entries, position).
 func delete_book(book_id: String) -> bool:
 	if _db == null:
 		push_error("Db.delete_book: no connection")
@@ -307,6 +330,7 @@ func delete_book(book_id: String) -> bool:
 	var ok := true
 	ok = ok and _db.query_with_bindings("DELETE FROM paragraphs WHERE book_id = ?;", [book_id])
 	ok = ok and _db.query_with_bindings("DELETE FROM bookmarks WHERE book_id = ?;", [book_id])
+	ok = ok and _db.query_with_bindings("DELETE FROM toc_entries WHERE book_id = ?;", [book_id])
 	ok = ok and _db.query_with_bindings("DELETE FROM books WHERE id = ?;", [book_id])
 	ok = ok and _db.query_with_bindings(
 		"""DELETE FROM settings WHERE "key" = ?;""", [seq_key(book_id)]

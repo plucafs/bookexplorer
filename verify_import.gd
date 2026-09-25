@@ -28,6 +28,11 @@ func _init() -> void:
 	db.query("SELECT chapter, text FROM paragraphs ORDER BY seq LIMIT 3;")
 	for row in db.query_result:
 		print("SAMPLE [", row["chapter"], "]: ", str(row["text"]).left(140))
+	db.query_with_bindings(
+		"SELECT seq, title FROM toc_entries WHERE book_id = ? ORDER BY seq ASC LIMIT 5;",
+		[str(result["book_id"])]
+	)
+	print("TOC: ", db.query_result)
 	db.close_db()
 	quit(0)
 

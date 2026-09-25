@@ -75,7 +75,7 @@ func _rebuild(entries: Array[Dictionary], current_seq: int) -> void:
 		child.free()
 	for entry: Dictionary in entries:
 		var seq := int(entry.get("seq", -1))
-		var display := str(entry.get("chapter", "")).get_file().get_basename()
+		var display := str(entry.get("title", ""))  # display-ready from Db.get_toc
 		if display.is_empty():
 			display = "—"
 		var item := ITEM_SCENE.instantiate() as Button

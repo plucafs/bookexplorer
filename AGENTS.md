@@ -34,6 +34,7 @@ books(id TEXT PRIMARY KEY /*dc:identifier, fallback filename hash*/, title, auth
 paragraphs(id INTEGER PK AUTOINCREMENT, book_id, seq INT, chapter, text);
 settings(key TEXT PK, value TEXT);  -- last_book_id
 bookmarks(id INTEGER PK AUTOINCREMENT, book_id, seq INT, created_at INT, UNIQUE(book_id, seq));
+toc_entries(id INTEGER PK AUTOINCREMENT, book_id, seq INT, title TEXT);  -- real epub TOC
 ```
 
 Addon: `addons/godot-sqlite` (GDExtension, class `SQLite`: `open_db`, `query`, `query_with_bindings`, `query_result`).
@@ -43,7 +44,8 @@ subquery), `touch_book(id)` (opened → first), `get_random_paragraph(exclude_id
 for the feed), `delete_book(id)` (transaction, cascades bookmarks),
 `toggle_bookmark(book_id, seq) -> bool` (add/remove, returns new state),
 `is_bookmarked(book_id, seq)`, `get_bookmarked_paragraphs(book_id)` (JOIN paragraphs, ORDER BY seq),
-`get_toc(book_id)` → `[{chapter, seq}]` (GROUP BY chapter, MIN(seq), reading order).
+`get_toc(book_id)` → `[{title, seq}]` — **title is display-ready**: rows from
+`toc_entries` (epub nav/NCX), else fallback = chapter href basename or `—`.
 
 ### Import pipeline (EpubImporter)
 
@@ -52,8 +54,15 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
 3. `XMLParser` on OPF: `dc:title`/`dc:creator`/`dc:identifier` (also accepts names without the `dc:` prefix), manifest, spine in order.
 4. Cover: manifest item `properties` containing `cover-image`, or `meta[name=cover]`.
 5. For each spine html/xhtml item: XML parse, skip `head/script/style`, flush paragraphs on block tags (`p`,`h1-h6`,`li`,`blockquote`,`pre`,`figcaption`,…), filter empties, global `seq`.
-6. Malformed XHTML → regex strip-tag fallback + `push_error`, the import continues.
-7. Re-import same id → DELETE of the existing book before the insert (transaction).
+6. **Real TOC** (`_collect_toc`): EPUB3 nav (`properties~"nav"`, `_parse_nav` picks the
+   `<nav epub:type~"toc">` else the first nav, `<a>` titles incl. nested tags) →
+   EPUB2 NCX (`<spine toc>`, `_parse_nav`/`_parse_ncx` navPoints in start order)
+   → none. hrefs resolved vs the nav/NCX file dir (fragments stripped via
+   `_resolve_href`); mapped to the first paragraph seq of that chapter_href;
+   empty title → href basename; dedupe by seq; hrefs without paragraphs dropped.
+   Persisted as `toc_entries` in the same transaction (re-import DELETEs first).
+7. Malformed XHTML → regex strip-tag fallback + `push_error`, the import continues.
+8. Re-import same id → DELETE of the existing book/paragraphs/toc_entries before the insert (transaction).
 
 ### Library (`ui/library/`)
 
@@ -151,7 +160,8 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   −96…−16). Overlay `mouse_filter=STOP` blocks reader gestures.
   Rows = `toc_item.tscn` buttons (56px, `chapter_selected(seq)`), current
   chapter in gold; **LineEdit "Search chapters…"** at the bottom filters rows
-  case-insensitively. Empty chapter href displays as `—`.
+  case-insensitively. Entry titles are display-ready (`entry.title`, no
+  basename processing in the UI).
   **List drag-to-scroll** (items are Buttons: per-item `gui_input`, absolute
   model in global coords, `DRAG_THRESHOLD`=8px; a release after a drag is
   swallowed). **Pull-down dismiss** (`DISMISS_THRESHOLD`=80px down): on the
@@ -168,6 +178,12 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   `↩ Back to "ch" (¶n)` via `_return_label`; `return_requested` → mode NORMAL
   = `_jump_to_seq(seq)`, mode BOOKMARKS = restore `_bookmark_paragraphs` at
   the captured index; then pending = -1.
+- **Real chapter titles everywhere**: `_load_toc_titles()` caches
+  `Db.get_toc(book.id)` in `setup/setup_feed/setup_bookmarks`;
+  `_title_for_seq(seq)` = last entry with `seq ≤ target` (empty → href
+  basename fallback). Used by the top **chapter label** (+ ` ★` when
+  bookmarked), `_return_label`, and `_open_toc` (cache, no extra query).
+  Books imported before `toc_entries` keep the basename fallback until re-import.
   `_open_toc()`: `Db.get_toc(_book.id)` (works in every mode), skipped if
   entries empty. **`_jump_to_seq`**: normal/peek → slide
   `_commit(target, ±dir, keep_peek=_peek)` (normal saves at finish unless
@@ -211,7 +227,7 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
 
 Two ways, after a successful import:
 
-1. Script: `godot --headless --path . -s res://verify_import.gd` (prints books/counts/3 samples)
+1. Script: `godot --headless --path . -s res://verify_import.gd` (prints books/counts/3 samples + first TOC titles)
 2. Manual SQL on `~/.local/share/godot/app_userdata/bookexplorer/library.db`:
 
 ```sql

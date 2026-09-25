@@ -57,6 +57,9 @@ var _toc_return_seq := -1        # global seq of the book, -1 = none
 var _toc_return_mode := 0        # 0 = normal book, 1 = bookmark list
 var _toc_return_list_index := 0  # bookmark-list index when mode = 1
 
+# Display-ready chapter titles (epub nav/NCX via Db.get_toc), loaded on setup.
+var _toc_titles: Array[Dictionary] = []
+
 var _cover_cached: ImageTexture = null
 var _cover_book_id := ""
 
@@ -104,7 +107,7 @@ func _reset_session_state() -> void:
 func _open_toc() -> void:
 	if _book.is_empty() or _paragraphs.is_empty():
 		return
-	var entries := Db.get_toc(str(_book.get("id", "")))
+	var entries := _toc_titles
 	if entries.is_empty():
 		return
 	var current := int(_paragraphs[_seq].get("seq", -1))
@@ -122,16 +125,31 @@ func _open_toc() -> void:
 	_toc.open(entries, current, return_text, not _no_save)
 
 
-## "↩ Back to <chapter> (¶n)" for the return button; chapter if known.
+## Load the display titles once per reader session (real TOC, else fallback).
+func _load_toc_titles() -> void:
+	if _book.is_empty():
+		_toc_titles = []
+	else:
+		_toc_titles = Db.get_toc(str(_book.get("id", "")))
+
+
+## Chapter title for a paragraph seq: the last TOC entry at or before it.
+## Empty when there is no entry yet (caller falls back to the href basename).
+func _title_for_seq(seq: int) -> String:
+	var title := ""
+	for entry: Dictionary in _toc_titles:
+		if int(entry.get("seq", 0)) > seq:
+			break
+		title = str(entry.get("title", ""))
+	return title
+
+
+## "↩ Back to <chapter> (¶n)" from the real chapter title.
 func _return_label(seq: int) -> String:
-	var rows := _all_paragraphs if not _all_paragraphs.is_empty() else _paragraphs
-	for row: Dictionary in rows:
-		if int(row.get("seq", -1)) == seq:
-			var chapter := str(row.get("chapter", "")).get_file().get_basename()
-			if chapter.is_empty():
-				break
-			return "↩ Back to \"%s\" (¶%d)" % [chapter, seq + 1]
-	return "↩ Back to paragraph %d" % (seq + 1)
+	var chapter := _title_for_seq(seq)
+	if chapter.is_empty() or chapter == "—":
+		return "↩ Back to paragraph %d" % (seq + 1)
+	return "↩ Back to \"%s\" (¶%d)" % [chapter, seq + 1]
 
 
 ## Return button: jump back to the captured position/mode and clear it.
@@ -207,6 +225,7 @@ func setup(book: Dictionary, paragraphs: Array[Dictionary]) -> void:
 	if _paragraphs.is_empty():
 		push_error("reader.setup: no paragraphs for the book")
 		return
+	_load_toc_titles()
 	_reset_panels()
 	var seq_key := Db.seq_key(str(_book.get("id", "")))
 	_seq = clampi(int(Db.get_setting(seq_key)), 0, _paragraphs.size() - 1)
@@ -230,6 +249,7 @@ func setup_feed(row: Dictionary) -> void:
 	_bookmark_paragraphs.clear()
 	_all_paragraphs.clear()
 	_reset_session_state()
+	_load_toc_titles()
 	_reset_panels()
 	_seq = 0
 	_render_current()
@@ -252,6 +272,7 @@ func setup_bookmarks(
 	if _paragraphs.is_empty():
 		push_error("reader.setup_bookmarks: no bookmarks")
 		return
+	_load_toc_titles()
 	_reset_panels()
 	_seq = 0
 	_render_current()
@@ -761,7 +782,9 @@ func _render_current() -> void:
 		_update_cover()
 		return
 	var book_id := str(_book.get("id", ""))
-	var chapter := str(row["chapter"]).get_file().get_basename()
+	var chapter := _title_for_seq(int(row.get("seq", -1)))
+	if chapter.is_empty():
+		chapter = str(row["chapter"]).get_file().get_basename()
 	if _bookmark_mode:
 		# Browsing bookmarks: ★ always on, counter = list position,
 		# no progress bar and no last_seq write.

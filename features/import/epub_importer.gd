@@ -1,6 +1,7 @@
 class_name EpubImporter
 extends RefCounted
-## Imports an epub: ZIPReader + XMLParser → paragraphs + cover into SQLite.
+## Imports an epub: ZIPReader + XMLParser → paragraphs + cover + real TOC
+## (EPUB3 nav / EPUB2 NCX → toc_entries) into SQLite.
 ## To be used on a Thread: import_epub() opens its own SQLite connection.
 ## UI updates only via progress_cb.call_deferred() (thread-safe).
 
@@ -74,6 +75,7 @@ func import_epub(source_path: String, db_path: String, progress_cb: Callable = C
 		book_id = source_path.get_file().md5_text()
 
 	var paragraphs := _collect_paragraphs(zip, str(opf_path), meta, progress_cb)
+	var toc_rows := _collect_toc(zip, meta, paragraphs)
 
 	var cover: PackedByteArray = PackedByteArray()
 	var cover_href: String = str(meta["cover_href"])
@@ -91,7 +93,7 @@ func import_epub(source_path: String, db_path: String, progress_cb: Callable = C
 	if title.is_empty():
 		title = source_path.get_file().get_basename().replace("_", " ").replace("-", " ")
 
-	var ok := _persist(db, book_id, title, str(meta["author"]), cover, paragraphs)
+	var ok := _persist(db, book_id, title, str(meta["author"]), cover, paragraphs, toc_rows)
 	db.close_db()
 	_cleanup_tmp()
 
@@ -141,7 +143,7 @@ func _find_opf_path(zip: ZIPReader) -> String:
 	return ""
 
 
-## Returns {title, author, id, manifest: Dictionary, spine: Array[String], cover_href}.
+## Returns {title, author, id, manifest, spine, cover_href, nav_href, ncx_href}.
 func _parse_opf(opf_bytes: PackedByteArray, opf_path: String) -> Dictionary:
 	var manifest := {}
 	var spine: Array[String] = []
@@ -150,6 +152,8 @@ func _parse_opf(opf_bytes: PackedByteArray, opf_path: String) -> Dictionary:
 	var book_id := ""
 	var cover_id := ""
 	var meta_cover_id := ""
+	var nav_id := ""
+	var spine_toc_id := ""
 	var section := ""  # metadata | manifest | spine
 	var base_dir := opf_path.get_base_dir()
 
@@ -164,6 +168,8 @@ func _parse_opf(opf_bytes: PackedByteArray, opf_path: String) -> Dictionary:
 				var name := _local(parser.get_node_name())
 				if name == "metadata" or name == "manifest" or name == "spine":
 					section = "" if parser.is_empty() else name
+					if name == "spine":
+						spine_toc_id = _attr(parser, "toc")  # EPUB2 NCX id
 					continue
 				if section == "metadata" and name == "meta":
 					if _attr(parser, "name") == "cover":
@@ -196,8 +202,11 @@ func _parse_opf(opf_bytes: PackedByteArray, opf_path: String) -> Dictionary:
 							"href": _attr(parser, "href"),
 							"media_type": _attr(parser, "media-type"),
 						}
-						if _attr(parser, "properties").find("cover-image") != -1:
+						var props := _attr(parser, "properties")
+						if props.find("cover-image") != -1:
 							cover_id = id
+						if props.find("nav") != -1:
+							nav_id = id  # EPUB3 nav document
 					continue
 				if section == "spine" and name == "itemref":
 					var idref := _attr(parser, "idref")
@@ -214,10 +223,17 @@ func _parse_opf(opf_bytes: PackedByteArray, opf_path: String) -> Dictionary:
 	var cover_href := ""
 	if chosen != "" and manifest.has(chosen):
 		cover_href = _resolve_href(base_dir, str(manifest[chosen]["href"]))
+	var nav_href := ""
+	if nav_id != "" and manifest.has(nav_id):
+		nav_href = _resolve_href(base_dir, str(manifest[nav_id]["href"]))
+	var ncx_href := ""
+	if spine_toc_id != "" and manifest.has(spine_toc_id):
+		ncx_href = _resolve_href(base_dir, str(manifest[spine_toc_id]["href"]))
 
 	return {
 		"title": title, "author": author, "id": book_id,
 		"manifest": manifest, "spine": spine, "cover_href": cover_href,
+		"nav_href": nav_href, "ncx_href": ncx_href,
 	}
 
 
@@ -252,6 +268,136 @@ func _collect_paragraphs(
 			out.append({ "chapter": href, "text": p })
 
 	return out
+
+
+## Real TOC entries mapped to first-paragraph seqs: [{seq, title}, ...].
+## Source: EPUB3 nav → EPUB2 NCX → none (empty: caller keeps fallback).
+func _collect_toc(
+	zip: ZIPReader, meta: Dictionary, paragraphs: Array[Dictionary]
+) -> Array[Dictionary]:
+	var raw: Array[Dictionary] = []
+	var nav_href := str(meta.get("nav_href", ""))
+	var ncx_href := str(meta.get("ncx_href", ""))
+	if not nav_href.is_empty() and zip.get_files().has(nav_href):
+		raw = _parse_nav(zip.read_file(nav_href), nav_href.get_base_dir())
+	if raw.is_empty() and not ncx_href.is_empty() and zip.get_files().has(ncx_href):
+		raw = _parse_ncx(zip.read_file(ncx_href), ncx_href.get_base_dir())
+	if raw.is_empty():
+		return []
+	# chapter href → first paragraph seq (same resolution as _collect_paragraphs)
+	var chapter_seq := {}
+	for i in paragraphs.size():
+		var ch := str(paragraphs[i]["chapter"])
+		if not chapter_seq.has(ch):
+			chapter_seq[ch] = i
+	var out: Array[Dictionary] = []
+	var seen := {}
+	for entry: Dictionary in raw:
+		var href := str(entry.get("href", ""))
+		var title := str(entry.get("title", "")).strip_edges()
+		if title.is_empty():
+			title = href.get_file().get_basename()
+		if not chapter_seq.has(href):
+			continue  # points at a file with no paragraphs
+		var seq := int(chapter_seq[href])
+		if seen.has(seq):
+			continue  # multiple navPoints into one file → first wins
+		seen[seq] = true
+		out.append({ "seq": seq, "title": title })
+	return out
+
+
+## EPUB3 nav: entries of the <nav epub:type="toc">, else the first <nav>.
+## hrefs resolved relative to the nav file dir (base_dir), fragments stripped.
+func _parse_nav(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
+	var navs: Array[Array] = []
+	var toc_nav := -1
+	var current_nav := -1
+	var pending := {}
+	var parser := XMLParser.new()
+	if parser.open_buffer(bytes) != OK:
+		push_error("EpubImporter: nav not parseable")
+		return []
+	while parser.read() == OK:
+		match parser.get_node_type():
+			XMLParser.NODE_ELEMENT:
+				var name := _local(parser.get_node_name())
+				if name == "nav":
+					navs.append([])
+					current_nav = navs.size() - 1
+					if _attr(parser, "epub:type").to_lower().find("toc") != -1:
+						toc_nav = current_nav
+				elif name == "a" and current_nav >= 0 and pending.is_empty():
+					var href := _attr(parser, "href")
+					if not href.is_empty():
+						pending = { "href": href, "title": "" }
+			XMLParser.NODE_TEXT, XMLParser.NODE_CDATA:
+				if not pending.is_empty():
+					pending["title"] = str(pending["title"]) + parser.get_node_data()
+			XMLParser.NODE_ELEMENT_END:
+				var end_name := _local(parser.get_node_name())
+				if end_name == "a" and not pending.is_empty() and current_nav >= 0:
+					navs[current_nav].append({
+						"title": str(pending["title"]).strip_edges(),
+						"href": _resolve_href(base_dir, str(pending["href"])),
+					})
+					pending = {}
+				elif end_name == "nav":
+					current_nav = -1
+	var chosen := toc_nav
+	if chosen < 0 and not navs.is_empty():
+		chosen = 0
+	if chosen < 0:
+		return []
+	var out: Array[Dictionary] = []
+	for entry in navs[chosen]:
+		out.append(entry)
+	return out
+
+
+## EPUB2 NCX: navPoints in start order (a parent before its children).
+## content src relative to the NCX file dir (base_dir), fragments stripped.
+func _parse_ncx(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var stack: Array[int] = []  # indices into out of the open navPoints
+	var parser := XMLParser.new()
+	if parser.open_buffer(bytes) != OK:
+		push_error("EpubImporter: NCX not parseable")
+		return []
+	while parser.read() == OK:
+		match parser.get_node_type():
+			XMLParser.NODE_ELEMENT:
+				var name := _local(parser.get_node_name())
+				if name == "navpoint":
+					out.append({ "title": "", "href": "" })
+					stack.append(out.size() - 1)
+					if parser.is_empty():
+						stack.pop_back()
+				elif name == "text" and not stack.is_empty():
+					var text := ""
+					if parser.is_empty():
+						text = parser.get_node_data()
+					else:
+						while parser.read() == OK:
+							if parser.get_node_type() == XMLParser.NODE_ELEMENT_END:
+								break
+							if parser.get_node_type() == XMLParser.NODE_TEXT \
+									or parser.get_node_type() == XMLParser.NODE_CDATA:
+								text += parser.get_node_data()
+					var idx: int = stack.back()
+					out[idx]["title"] = str(out[idx]["title"]) + text.strip_edges()
+				elif name == "content" and not stack.is_empty():
+					var src := _attr(parser, "src")
+					if not src.is_empty():
+						out[stack.back()]["href"] = _resolve_href(base_dir, src)
+			XMLParser.NODE_ELEMENT_END:
+				if _local(parser.get_node_name()) == "navpoint" and not stack.is_empty():
+					stack.pop_back()
+	var clean: Array[Dictionary] = []
+	for entry: Dictionary in out:
+		if not str(entry.get("href", "")).is_empty():
+			clean.append(entry)
+	return clean
 
 
 func _extract_paragraphs(bytes: PackedByteArray) -> Array[String]:
@@ -362,7 +508,7 @@ func _resolve_href(base_dir: String, href: String) -> String:
 
 func _persist(
 	db: SQLite, book_id: String, title: String, author: String,
-	cover: PackedByteArray, paragraphs: Array[Dictionary]
+	cover: PackedByteArray, paragraphs: Array[Dictionary], toc_rows: Array[Dictionary]
 ) -> bool:
 	if not db.query("BEGIN;"):
 		push_error("EpubImporter BEGIN: %s" % db.error_message)
@@ -370,6 +516,7 @@ func _persist(
 
 	var ok := true
 	ok = ok and db.query_with_bindings("DELETE FROM paragraphs WHERE book_id = ?;", [book_id])
+	ok = ok and db.query_with_bindings("DELETE FROM toc_entries WHERE book_id = ?;", [book_id])
 	ok = ok and db.query_with_bindings("DELETE FROM books WHERE id = ?;", [book_id])
 	ok = ok and db.query_with_bindings(
 		"""INSERT INTO books (id, title, author, cover, paragraph_count, imported_at)
@@ -383,6 +530,14 @@ func _persist(
 		ok = db.query_with_bindings(
 			"INSERT INTO paragraphs (book_id, seq, chapter, text) VALUES (?, ?, ?, ?);",
 			[book_id, i, str(row["chapter"]), str(row["text"])]
+		)
+	for i in toc_rows.size():
+		if not ok:
+			break
+		var entry: Dictionary = toc_rows[i]
+		ok = db.query_with_bindings(
+			"INSERT INTO toc_entries (book_id, seq, title) VALUES (?, ?, ?);",
+			[book_id, int(entry["seq"]), str(entry["title"])]
 		)
 
 	if not ok:
