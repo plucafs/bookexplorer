@@ -9,7 +9,7 @@ signal exit_requested
 signal library_requested
 
 const SLIDE_DURATION := 0.28
-const SWIPE_THRESHOLD := 100.0   # logical px to change paragraph (short text)
+const SWIPE_THRESHOLD := 60.0   # logical px to change paragraph (short text) (100.0)
 const DRAG_RESISTANCE := 0.35    # resistance at the edges (0 / N-1)
 const HANDOFF_MIN := 40.0        # px past the text edge to change paragraph
 const WHEEL_STEP := 80.0         # px per wheel step
@@ -32,6 +32,7 @@ const PINCH_THRESHOLD := 60.0    # px of finger-distance change to fire a pinch
 @onready var _toc: TocPanel = %Toc
 @onready var _toc_bar_button: Button = %TocBarButton
 @onready var _counter_bar_button: Button = %CounterBarButton
+@onready var _paragraph_view: ParagraphView = %ParagraphView
 
 var _book: Dictionary = {}
 var _paragraphs: Array[Dictionary] = []
@@ -59,6 +60,10 @@ var _toc_return_list_index := 0  # bookmark-list index when mode = 1
 
 # Display-ready chapter titles (epub nav/NCX via Db.get_toc), loaded on setup.
 var _toc_titles: Array[Dictionary] = []
+
+# Pending tap → full-paragraph view: any new press bumps the token and
+# cancels the armed DOUBLE_TAP_MS timer (double tap then goes to library).
+var _tap_token := 0
 
 var _cover_cached: ImageTexture = null
 var _cover_book_id := ""
@@ -93,6 +98,7 @@ func _ready() -> void:
 	_toc.close_requested.connect(_toc.close)
 	_toc.return_requested.connect(_on_toc_return)
 	_toc.save_toggle_requested.connect(_on_save_toggle)
+	#_paragraph_view.swipe_closed.connect(_on_paragraph_swipe_closed)
 
 
 ## New reader session: no-save off, no return point, counter normal.
@@ -281,6 +287,9 @@ func setup_bookmarks(
 ## Android back / Escape: close the TOC first, then leave a peek (back to
 ## the bookmark list); otherwise let the caller exit the reader.
 func handle_back() -> bool:
+	if _paragraph_view.is_open():
+		_paragraph_view.close()  # stays on the current paragraph (no advance)
+		return true
 	if _toc.is_open():
 		_toc.close()
 		return true
@@ -396,6 +405,7 @@ func _enter_multi() -> void:
 	_multi_dx = 0.0
 	_pinch_consumed = false
 	_pinch_base_dist = _pinch_distance()
+	_tap_token += 1  # a multi-finger gesture cancels a pending view open
 	_hold_cancel()
 	if _dragging:
 		_dragging = false
@@ -499,6 +509,7 @@ func _jump(dir: int) -> void:
 
 
 func _begin_drag(pos: Vector2) -> void:
+	_tap_token += 1  # any new press cancels a pending tap → view open
 	_dragging = true
 	_drag_start = pos
 	_drag_delta = Vector2.ZERO
@@ -589,7 +600,9 @@ func _process(delta: float) -> void:
 		label.position.y = -scroll
 
 
-## Single tap = nothing; double tap within DOUBLE_TAP_MS → back to the library.
+## 1st tap arms a DOUBLE_TAP_MS timer → opens the full-paragraph view;
+## a 2nd tap inside the window goes back to the library (its press already
+## bumped _tap_token, cancelling the pending open).
 func _handle_tap() -> void:
 	var now := Time.get_ticks_msec()
 	if now - _last_tap_msec <= DOUBLE_TAP_MS:
@@ -597,6 +610,35 @@ func _handle_tap() -> void:
 		library_requested.emit()
 	else:
 		_last_tap_msec = now
+		_arm_tap_open()
+
+
+func _arm_tap_open() -> void:
+	var token := _tap_token
+	get_tree().create_timer(DOUBLE_TAP_MS / 1000.0).timeout.connect(
+		func() -> void: _on_tap_timeout(token)
+	)
+
+
+func _on_tap_timeout(token: int) -> void:
+	if token != _tap_token or not visible:
+		return
+	if _paragraph_view.is_open() or _toc.is_open():
+		return
+	_open_paragraph_view()
+
+
+## Tap timer fired: show the whole paragraph in the slide-in view.
+func _open_paragraph_view() -> void:
+	if _paragraphs.is_empty():
+		return
+	var row: Dictionary = _paragraphs[_seq]
+	_paragraph_view.open(str(row["text"]), _chapter_label.text, _counter_label.text)
+
+
+## Swipe-close from the full view: continue reading at the next paragraph.
+func _on_paragraph_swipe_closed() -> void:
+	_go(1)
 
 
 ## Drag dy (cumulative from gesture start): >0 = finger toward the bottom.
@@ -652,19 +694,20 @@ func _handoff(dir: int) -> void:
 func _wheel(dir: int) -> void:
 	if _is_animating() or _paragraphs.is_empty():
 		return
+	_tap_token += 1  # wheel cancels a pending tap → view open
 	var overflow := _active_overflow()
 	var label := _active_text
 	var scroll := -label.position.y
 	if dir > 0:
 		if scroll >= overflow - 0.5:
 			_go(1)
-		else:
-			label.position.y = maxf(label.position.y - WHEEL_STEP, -overflow)
+			return
+		label.position.y = maxf(label.position.y - WHEEL_STEP, -overflow)
 	else:
 		if scroll <= 0.5:
 			_go(-1)
-		else:
-			label.position.y = minf(label.position.y + WHEEL_STEP, 0.0)
+			return
+		label.position.y = minf(label.position.y + WHEEL_STEP, 0.0)
 
 
 ## dir > 0 = next paragraph, dir < 0 = previous.
@@ -818,10 +861,15 @@ func _schedule_reset(label: Label) -> void:
 
 ## How much of the text exceeds the visible window (0 = it all fits).
 func _active_overflow() -> float:
-	var box := _active_text.get_parent() as Control
+	return _overflow_of(_active_text)
+
+
+## Overflow of an arbitrary text label against its viewport.
+func _overflow_of(label: Label) -> float:
+	var box := label.get_parent() as Control
 	if box == null:
 		return 0.0
-	return maxf(0.0, _active_text.size.y - box.size.y)
+	return maxf(0.0, label.size.y - box.size.y)
 
 
 func _update_cover() -> void:

@@ -1,12 +1,16 @@
+class_name ParagraphView
 extends Control
 ## Full-paragraph view: scrollable text, swipe right (or Esc/back) to close.
 ## Swipe detection in _input: only the dominant horizontal axis is consumed,
 ## the vertical one passes to the ScrollContainer.
+## `closed` fires on every close; `swipe_closed` only when closed by the
+## rightward swipe (the reader uses it to advance to the next paragraph).
 
 signal closed
+signal swipe_closed
 
 const SLIDE_DURATION := 0.28
-const SWIPE_RIGHT_THRESHOLD := 120.0
+const SWIPE_RIGHT_THRESHOLD := 60.0 #120.0
 
 @onready var _scroll: ScrollContainer = %Scroll
 @onready var _text_label: Label = %FullTextLabel
@@ -18,6 +22,7 @@ var _tween: Tween = null
 var _closing := false
 var _dragging := false
 var _drag_start := Vector2.ZERO
+var _by_swipe := false  # close initiated by _try_close (advances the reader)
 
 
 func _ready() -> void:
@@ -95,6 +100,7 @@ func _try_close(end_pos: Vector2) -> void:
 	var delta := end_pos - _drag_start
 	if delta.x > SWIPE_RIGHT_THRESHOLD and absf(delta.x) > absf(delta.y):
 		get_viewport().set_input_as_handled()
+		_by_swipe = true
 		close()
 
 
@@ -104,6 +110,9 @@ func _on_closed() -> void:
 	visible = false
 	position = Vector2.ZERO
 	closed.emit()
+	if _by_swipe:
+		_by_swipe = false
+		swipe_closed.emit()
 
 
 func _kill_tween() -> void:

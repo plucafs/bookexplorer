@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://cyuw6krasafba"]
 
 [ext_resource type="Script" uid="uid://cebmkycqciir1" path="res://ui/paragraph_view/paragraph_view.gd" id="1_pview"]
+[ext_resource type="Theme" uid="uid://dlpcwhdihbx66" path="res://themes/reader_theme.tres" id="2_gmd2p"]
 
 [node name="ParagraphView" type="Control" unique_id=384113677]
 visible = false
@@ -10,7 +11,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
 script = ExtResource("1_pview")
 
 [node name="Background" type="ColorRect" parent="." unique_id=30227501]
@@ -57,12 +57,15 @@ unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 0
 horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+scroll_deadzone = 25
 
 [node name="FullTextLabel" type="Label" parent="MarginContainer/VBoxContainer/TextMargin/Scroll" unique_id=852385527]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 22
+theme = ExtResource("2_gmd2p")
+theme_override_font_sizes/font_size = 28
 autowrap_mode = 3
 
 [node name="CounterLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=1572555670]

@@ -9,6 +9,7 @@ An epub reader and explorer for Android
 	- scroll through the ebooks list
 	- tap to open
 	- scroll back/forward to change paragraph
+	- tap to read the full paragraph (swipe to continue, Esc/back to stay)
 	- double tap to go back to the library
 	- pinch inside to toggle the bookmark
 	- tap the progress bar to open the Table of contents (TOC), scroll down to close it

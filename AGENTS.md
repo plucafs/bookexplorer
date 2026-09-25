@@ -22,7 +22,8 @@ ui/empty_state/               empty state: "Open epub" button
 ui/importing/                 progress/error overlay
 ui/confirmation/              import confirmation + "Start reading" button
 ui/reader/                    TikTok reading feed (one paragraph per screen)
-ui/paragraph_view/            full-paragraph view — DISCONNECTED (files kept, unused)
+ui/paragraph_view/            full-paragraph view — WIRED: class_name
+                              ParagraphView, instanced in reader.tscn (before Toc)
 main.gd + main.tscn           state switch: Empty → Importing → Confirmation → Reader
 ```
 
@@ -121,9 +122,22 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   from scroll at top).
 - **Short paragraph** (overflow=0): card follows the finger, `SWIPE_THRESHOLD` 100px → ±1.
   Wheel: scrolls unless at the edges, at the edge → ±1.
-- **Tap**: single = no action; **double tap** (≤15px movement, within `DOUBLE_TAP_MS`=300)
-  → `library_requested` → `main.gd` → `_set_screen(_library)` (always library). A non-tap
-  gesture (swipe/drag) resets the tap sequence.
+- **Tap**: 1st tap arms a `DOUBLE_TAP_MS` timer → opens the **full-paragraph
+  view** (`%ParagraphView.open(text, chapter, counter)`); 2nd tap inside the
+  window → `library_requested` (its press bumps `_tap_token`, cancelling the
+  pending open; `_begin_drag`/`_enter_multi`/`_wheel` also bump it).
+  A non-tap gesture resets the tap sequence.
+- **Full-paragraph view** (`ui/paragraph_view/`): slides in from the right.
+  **Swipe right ≥120px** → `swipe_closed` → reader `_go(+1)` (advance);
+  **Esc / Back button / Android back** (`handle_back` 1st check) → `closed`
+  only, stays on the current paragraph. `handle_back()` order: **view → TOC →
+  peek → exit**. While open the view's background swallows reader gestures.
+- **Ellipsis**: `%EllipsisA/%EllipsisB` ("…" bottom-right inside each
+  TextViewport, outline, IGNORE) — visible only when `_overflow_of(label) > 0`
+  AND not scrolled to the end (`position.y > -overflow + 2`). Updated in
+  `_reset_label` (covers render + deferred layout), `_apply_drag`, `_wheel`,
+  `_process`. `_active_overflow()` delegates to `_overflow_of()`; in-place
+  scroll/hold/handoff unchanged (label stays full height).
 - **Hold (auto-scroll)**: finger still ≥ `HOLD_MS` (450ms) on **long text** → automatic
   scrolling at `AUTO_SCROLL_SPEED` (40px/s) in `_process`; **stops at the end of the
   paragraph** (no continuation to the next) or on release; short paragraph →
@@ -199,7 +213,8 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   row (`book_id`+`cover`). Exit: back/double tap → library (`_reader_return`).
 - Bookmark entry from the star: `_reader_return = _library`, `touch_book` runs,
   `last_seq` untouched until the user navigates normally.
-- Paragraph view (`ui/paragraph_view/`): **disconnected** — no reference in reader/main.
+- Paragraph view (`ui/paragraph_view/`): **wired** — tap (delayed) opens it,
+  swipe right advances, Esc/back stays (see Tap above).
 - Animation: `create_tween().bind_node(self)`, `TRANS_CUBIC + EASE_OUT`, 0.28s, A/B panels swap
   roles; input blocked during the tween (`_kill_tween`); a release during the tween
   still resets `_dragging`.

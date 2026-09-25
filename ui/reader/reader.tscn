@@ -2,7 +2,8 @@
 
 [ext_resource type="Script" uid="uid://cqt7g3f5sl4mn" path="res://ui/reader/reader.gd" id="1_reader"]
 [ext_resource type="Theme" uid="uid://dlpcwhdihbx66" path="res://themes/reader_theme.tres" id="3_dj17l"]
-[ext_resource type="PackedScene" path="res://ui/toc/toc.tscn" id="4_toc"]
+[ext_resource type="PackedScene" uid="uid://cqlw0bpx03hfm" path="res://ui/toc/toc.tscn" id="4_toc"]
+[ext_resource type="PackedScene" uid="uid://cyuw6krasafba" path="res://ui/paragraph_view/paragraph_view.tscn" id="5_pview"]
 
 [sub_resource type="Gradient" id="Gradient_dj17l"]
 offsets = PackedFloat32Array(0, 0.3125, 0.65625, 1)
@@ -81,6 +82,7 @@ mouse_filter = 2
 
 [node name="TextLabelA" type="Label" parent="TextPanelA/TextViewport" unique_id=1764765694]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 550)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -88,6 +90,7 @@ offset_bottom = 23.0
 grow_horizontal = 2
 theme = ExtResource("3_dj17l")
 autowrap_mode = 3
+text_overrun_behavior = 4
 
 [node name="TextPanelB" type="Control" parent="." unique_id=551140971]
 unique_name_in_owner = true
@@ -115,6 +118,7 @@ mouse_filter = 2
 
 [node name="TextLabelB" type="Label" parent="TextPanelB/TextViewport" unique_id=315902423]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 550)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -122,6 +126,7 @@ offset_bottom = 23.0
 grow_horizontal = 2
 theme = ExtResource("3_dj17l")
 autowrap_mode = 3
+text_overrun_behavior = 4
 
 [node name="ChapterLabel" type="Label" parent="." unique_id=1334677543]
 unique_name_in_owner = true
@@ -171,30 +176,32 @@ layout_mode = 2
 mouse_filter = 2
 show_percentage = false
 
-[node name="TocBarButton" type="Button" parent="."]
+[node name="TocBarButton" type="Button" parent="." unique_id=1917301038]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 0.0
 offset_bottom = 80.0
 grow_horizontal = 2
 flat = true
 
-[node name="CounterBarButton" type="Button" parent="."]
+[node name="CounterBarButton" type="Button" parent="." unique_id=747381647]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 0.0
 offset_top = -96.0
-offset_right = 0.0
 offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 0
 flat = true
 
-[node name="Toc" parent="." instance=ExtResource("4_toc")]
+[node name="ParagraphView" parent="." unique_id=612347125 instance=ExtResource("5_pview")]
 unique_name_in_owner = true
+layout_mode = 1
+
+[node name="Toc" parent="." unique_id=736465354 instance=ExtResource("4_toc")]
+unique_name_in_owner = true
+layout_mode = 1
