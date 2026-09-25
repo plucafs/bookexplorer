@@ -14,7 +14,9 @@ config/name="bookexplorer"
 run/main_scene="uid://bns2ipjo1m00p"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 run/low_processor_mode=true
-config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/image="uid://bajjlh7vw637r"
+config/icon="uid://stwe1aklrgix"
 
 [autoload]
 
