@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://d36guyr0o13rd"]
 
 [ext_resource type="Script" uid="uid://bvwe27bwdj4tn" path="res://ui/library/library.gd" id="1_lib"]
+[ext_resource type="Texture2D" uid="uid://stwe1aklrgix" path="res://icon.png" id="2_222sl"]
 [ext_resource type="PackedScene" uid="uid://bde8ohbhflxb6" path="res://ui/library/library_item.tscn" id="2_item"]
 
 [node name="Library" type="Control" unique_id=417037583]
@@ -22,6 +23,11 @@ offset_right = -24.0
 offset_bottom = 56.0
 grow_horizontal = 2
 theme_override_constants/separation = 12
+
+[node name="TextureRect" type="TextureRect" parent="Header" unique_id=356370934]
+layout_mode = 2
+texture = ExtResource("2_222sl")
+expand_mode = 2
 
 [node name="TitleLabel" type="Label" parent="Header" unique_id=142098687]
 layout_mode = 2
