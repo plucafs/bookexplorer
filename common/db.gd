@@ -5,6 +5,10 @@ extends Node
 
 const DB_PATH := "user://library.db"
 
+## Feed: skip fragments shorter than this (chars), so headings, page
+## numbers and slivers never reach the random feed (0 = no filter).
+const FEED_MIN_TEXT_LENGTH := 100
+
 const SCHEMA_SQL := """
 CREATE TABLE IF NOT EXISTS books (
 	id TEXT PRIMARY KEY,
@@ -168,39 +172,48 @@ func _normalize_book(row: Dictionary) -> Dictionary:
 
 ## A random paragraph from ANY book (feed mode), with the book data
 ## (title/author/cover) for the cover and header. exclude_id = id of the
-## paragraph to avoid (-1 = none); max 3 attempts.
+## paragraph to avoid (-1 = none). Paragraphs shorter than
+## FEED_MIN_TEXT_LENGTH are skipped; when none qualifies, one unfiltered
+## attempt keeps the feed alive on short-only books.
 func get_random_paragraph(exclude_id: int = -1) -> Dictionary:
 	if _db == null:
 		return {}
-	for attempt in 3:
-		var ok := _db.query_with_bindings(
-			"""SELECT p.id, p.book_id, p.seq, p.chapter, p.text,
-			b.title, b.author, b.cover
-			FROM paragraphs p JOIN books b ON b.id = p.book_id
-			WHERE p.id != ? ORDER BY RANDOM() LIMIT 1;""",
-			[exclude_id]
-		)
-		if not ok:
-			push_error("Db.get_random_paragraph: %s" % _db.error_message)
-			return {}
-		var rows: Array = _db.query_result
-		if rows.is_empty():
-			return {}  # no rows (empty DB or only the excluded one)
-		var row := rows[0] as Dictionary
-		var cover: PackedByteArray = PackedByteArray()
-		if row.get("cover") is PackedByteArray:
-			cover = row["cover"]
-		return {
-			"id": int(row.get("id", -1)),
-			"book_id": str(row.get("book_id", "")),
-			"seq": int(row.get("seq", 0)),
-			"chapter": str(row.get("chapter", "")),
-			"text": str(row.get("text", "")),
-			"title": str(row.get("title", "")),
-			"author": str(row.get("author", "")),
-			"cover": cover,
-		}
-	return {}
+	var rows := _random_paragraph_rows(exclude_id, FEED_MIN_TEXT_LENGTH)
+	if rows.is_empty():
+		rows = _random_paragraph_rows(exclude_id, 0)
+	if rows.is_empty():
+		return {}  # no rows (empty DB or only the excluded one)
+	var row := rows[0] as Dictionary
+	var cover: PackedByteArray = PackedByteArray()
+	if row.get("cover") is PackedByteArray:
+		cover = row["cover"]
+	return {
+		"id": int(row.get("id", -1)),
+		"book_id": str(row.get("book_id", "")),
+		"seq": int(row.get("seq", 0)),
+		"chapter": str(row.get("chapter", "")),
+		"text": str(row.get("text", "")),
+		"title": str(row.get("title", "")),
+		"author": str(row.get("author", "")),
+		"cover": cover,
+	}
+
+
+## One random paragraph row (JOIN books); min_length filters on the text
+## size (0 = no filter), exclude_id -1 = none.
+func _random_paragraph_rows(exclude_id: int, min_length: int) -> Array:
+	var ok := _db.query_with_bindings(
+		"""SELECT p.id, p.book_id, p.seq, p.chapter, p.text,
+		b.title, b.author, b.cover
+		FROM paragraphs p JOIN books b ON b.id = p.book_id
+		WHERE p.id != ? AND length(p.text) >= ?
+		ORDER BY RANDOM() LIMIT 1;""",
+		[exclude_id, min_length]
+	)
+	if not ok:
+		push_error("Db.get_random_paragraph: %s" % _db.error_message)
+		return []
+	return _db.query_result
 
 
 ## Reading-position key for a book (one key per book).

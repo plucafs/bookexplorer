@@ -42,7 +42,8 @@ Addon: `addons/godot-sqlite` (GDExtension, class `SQLite`: `open_db`, `query`, `
 BLOB (cover): MANDATORY to use `query_with_bindings` with `PackedByteArray`.
 Db API: `get_books()` (ORDER BY imported_at DESC, includes `bookmark_count` via correlated
 subquery), `touch_book(id)` (opened → first), `get_random_paragraph(exclude_id)` (JOIN books,
-for the feed), `delete_book(id)` (transaction, cascades bookmarks),
+for the feed; skips text shorter than `FEED_MIN_TEXT_LENGTH` = 100 chars, one
+unfiltered fallback attempt for short-only books), `delete_book(id)` (transaction, cascades bookmarks),
 `toggle_bookmark(book_id, seq) -> bool` (add/remove, returns new state),
 `is_bookmarked(book_id, seq)`, `get_bookmarked_paragraphs(book_id)` (JOIN paragraphs, ORDER BY seq),
 `get_toc(book_id)` → `[{title, seq}]` — **title is display-ready**: rows from
