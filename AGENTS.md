@@ -112,15 +112,18 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   **2 A/B text panels OUTSIDE the Containers** (`position` is animated). Per panel:
   `TextViewport` (Control with clip, box margins 32/88/-32/-96) → `Label` **anchored at the top**
   (never inside a Container: autowrap has min-width 1px), height = full content
-  (`_reset_label`: `size.y = get_minimum_size().y` + `_schedule_reset` **deferred**
-  post-layout: the min computed before layout is wrong and doubles the height),
+  (`_reset_label`: `size.y = get_minimum_size().y + _focus_margin(label)` +
+  `_schedule_reset` **deferred** post-layout: the min computed before layout is
+  wrong and doubles the height). **Focus margin** = box bottom (panel-local) −
+  screen center: at max scroll the last line lands on the vertical middle of
+  the screen; paragraphs ending above the center keep overflow 0 (card swipe).
   **no ellipsis**.
 - **Long paragraph**: text scrolls in place (`label.position.y ∈ [−overflow, 0]`); the drag uses an
   **absolute** model (`_drag_start_scroll` captured in `_begin_drag`, never sum the cumulative delta
   to events); scroll is consumed first; past the edge a **rubber-band** resists
-  (`RUBBER_BAND` 0.35, cap `RUBBER_BAND_MAX` 120px) and the decision is taken
-  **on release** (`_finish_scroll_gesture(over)`): `|over| ≥ HANDOFF_MIN` (40px,
-  deadzone) → `_go(±1)` (the outgoing text settles to the edge via
+  (`RUBBER_BAND`, cap `RUBBER_BAND_MAX`) and the decision is taken
+  **on release** (`_finish_scroll_gesture(over)`): `|over| ≥ HANDOFF_MIN`
+  (deadzone) → `_go(±1)` (the outgoing text settles to the edge via
   `_settle_scroll`, the incoming restarts from scroll at top); below the deadzone
   the input is ignored and `_snap_scroll_back()` tweens the text back to the edge
   (`_scroll_tween`, killed by `_begin_drag`/`_wheel`/`_commit`/`_reset_panels`).
@@ -134,7 +137,7 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
 - **`USE_PARAGRAPH_VIEW`** (const, reader.gd): UX-test flag. `true` = tap opens
   the full-paragraph view (above). `false` = scroll-only mode: the tap never
   opens the view (double tap → library still works); long text scrolls to the
-  end freely and only a further `HANDOFF_MIN` (40px) past the edge at release
+  end freely and only a further `HANDOFF_MIN` past the edge at release
   advances (same deadzone as the view mode).
 - **Full-paragraph view** (`ui/paragraph_view/`): slides in from the right.
   **Swipe right ≥120px** → `swipe_closed` → reader `_go(+1)` (advance);

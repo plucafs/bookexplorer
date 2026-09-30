@@ -898,10 +898,21 @@ func _render_current() -> void:
 		Db.set_setting(Db.seq_key(book_id), str(_seq))
 
 
-## Label height = full content; scroll zeroed (text at top).
+## Label height = full content + the focus margin; scroll zeroed (top).
 func _reset_label(label: Label) -> void:
-	label.size.y = label.get_minimum_size().y
+	label.size.y = label.get_minimum_size().y + _focus_margin(label)
 	label.position.y = 0.0
+
+
+## Empty space under the text: at max scroll the last line lands on the
+## vertical center of the screen (box bottom − focus line). Panel-local, so
+## it does not depend on the animated panel position; the deferred
+## _schedule_reset recomputes it once the layout is final.
+func _focus_margin(label: Label) -> float:
+	var box := label.get_parent() as Control
+	if box == null:
+		return 0.0
+	return maxf(0.0, box.position.y + box.size.y - size.y * 0.5)
 
 
 ## Post-layout re-sync: the autowrap min-height with a width not yet
