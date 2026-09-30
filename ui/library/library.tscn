@@ -13,20 +13,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_lib")
 
-[node name="EmptyLabel" type="Label" parent="." unique_id=2080409449]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-text = "No books yet. Tap \"Open epub\" to import one."
-horizontal_alignment = 1
-vertical_alignment = 1
-
 [node name="Carousel" type="Control" parent="." unique_id=847970862]
 unique_name_in_owner = true
 visible = false
@@ -80,58 +66,70 @@ theme_override_font_sizes/font_size = 14
 text = "← swipe →"
 horizontal_alignment = 1
 
-[node name="MarginContainer" type="MarginContainer" parent="." unique_id=645652854]
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=240796073]
 layout_mode = 1
-anchors_preset = -1
-anchor_top = 0.69100004
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 51.51996
 grow_horizontal = 2
-grow_vertical = 0
+grow_vertical = 2
+
+[node name="AppIcon" type="TextureRect" parent="VBoxContainer" unique_id=356370934]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0.24705882)
+layout_mode = 2
+texture = ExtResource("2_222sl")
+expand_mode = 4
+
+[node name="EmptyLabel" type="Label" parent="VBoxContainer" unique_id=2080409449]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+text = "No books yet. Tap \"Open epub\" to import one."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=645652854]
+layout_mode = 2
 theme_override_constants/margin_left = 8
 theme_override_constants/margin_right = 8
 
-[node name="ColorRect" type="ColorRect" parent="MarginContainer" unique_id=2060371177]
+[node name="ColorRect" type="ColorRect" parent="VBoxContainer/MarginContainer" unique_id=2060371177]
 visible = false
 layout_mode = 2
 color = Color(0.28485027, 0.28485027, 0.28485027, 1)
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=357024430]
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/MarginContainer" unique_id=357024430]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Header" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=568026195]
+[node name="Header" type="HBoxContainer" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=568026195]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TextureRect" type="TextureRect" parent="MarginContainer/VBoxContainer/Header" unique_id=356370934]
-layout_mode = 2
-texture = ExtResource("2_222sl")
-expand_mode = 2
-
-[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer/Header" unique_id=142098687]
+[node name="TitleLabel" type="Label" parent="VBoxContainer/MarginContainer/VBoxContainer/Header" unique_id=142098687]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 24
 text = "Library"
 vertical_alignment = 1
 
-[node name="FeedButton" type="Button" parent="MarginContainer/VBoxContainer/Header" unique_id=1551072793]
+[node name="FeedButton" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer/Header" unique_id=1551072793]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "Feed"
 flat = true
 
-[node name="OpenButton" type="Button" parent="MarginContainer/VBoxContainer/Header" unique_id=462985646]
+[node name="OpenButton" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer/Header" unique_id=462985646]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "Open epub"
 flat = true
 
-[node name="Strip" type="MarginContainer" parent="MarginContainer/VBoxContainer" unique_id=963699248]
+[node name="Strip" type="MarginContainer" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=963699248]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
@@ -140,18 +138,18 @@ theme_override_constants/margin_top = 0
 theme_override_constants/margin_right = 0
 theme_override_constants/margin_bottom = 0
 
-[node name="Scroll" type="ScrollContainer" parent="MarginContainer/VBoxContainer/Strip" unique_id=630737524]
+[node name="Scroll" type="ScrollContainer" parent="VBoxContainer/MarginContainer/VBoxContainer/Strip" unique_id=630737524]
 unique_name_in_owner = true
 layout_mode = 2
 horizontal_scroll_mode = 2
 vertical_scroll_mode = 3
 
-[node name="BookRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer/Strip/Scroll" unique_id=509076629]
+[node name="BookRow" type="HBoxContainer" parent="VBoxContainer/MarginContainer/VBoxContainer/Strip/Scroll" unique_id=509076629]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="Spacer" type="Control" parent="MarginContainer/VBoxContainer" unique_id=1317621411]
+[node name="Spacer" type="Control" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=1317621411]
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 
