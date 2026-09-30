@@ -90,7 +90,6 @@ offset_bottom = 23.0
 grow_horizontal = 2
 theme = ExtResource("3_dj17l")
 autowrap_mode = 3
-text_overrun_behavior = 4
 
 [node name="TextPanelB" type="Control" parent="." unique_id=551140971]
 unique_name_in_owner = true
@@ -126,7 +125,6 @@ offset_bottom = 23.0
 grow_horizontal = 2
 theme = ExtResource("3_dj17l")
 autowrap_mode = 3
-text_overrun_behavior = 4
 
 [node name="ChapterLabel" type="Label" parent="." unique_id=1334677543]
 unique_name_in_owner = true

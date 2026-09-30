@@ -117,9 +117,13 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   **no ellipsis**.
 - **Long paragraph**: text scrolls in place (`label.position.y ∈ [−overflow, 0]`); the drag uses an
   **absolute** model (`_drag_start_scroll` captured in `_begin_drag`, never sum the cumulative delta
-  to events); scroll is consumed first; passing `HANDOFF_MIN` (40px) beyond the
-  text edge → `_handoff(±1)` → slide to next/prev paragraph (incoming restarts
-  from scroll at top).
+  to events); scroll is consumed first; past the edge a **rubber-band** resists
+  (`RUBBER_BAND` 0.35, cap `RUBBER_BAND_MAX` 120px) and the decision is taken
+  **on release** (`_finish_scroll_gesture(over)`): `|over| ≥ HANDOFF_MIN` (40px,
+  deadzone) → `_go(±1)` (the outgoing text settles to the edge via
+  `_settle_scroll`, the incoming restarts from scroll at top); below the deadzone
+  the input is ignored and `_snap_scroll_back()` tweens the text back to the edge
+  (`_scroll_tween`, killed by `_begin_drag`/`_wheel`/`_commit`/`_reset_panels`).
 - **Short paragraph** (overflow=0): card follows the finger, `SWIPE_THRESHOLD` 100px → ±1.
   Wheel: scrolls unless at the edges, at the edge → ±1.
 - **Tap**: 1st tap arms a `DOUBLE_TAP_MS` timer → opens the **full-paragraph
@@ -127,17 +131,20 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   window → `library_requested` (its press bumps `_tap_token`, cancelling the
   pending open; `_begin_drag`/`_enter_multi`/`_wheel` also bump it).
   A non-tap gesture resets the tap sequence.
+- **`USE_PARAGRAPH_VIEW`** (const, reader.gd): UX-test flag. `true` = tap opens
+  the full-paragraph view (above). `false` = scroll-only mode: the tap never
+  opens the view (double tap → library still works); long text scrolls to the
+  end freely and only a further `HANDOFF_MIN` (40px) past the edge at release
+  advances (same deadzone as the view mode).
 - **Full-paragraph view** (`ui/paragraph_view/`): slides in from the right.
   **Swipe right ≥120px** → `swipe_closed` → reader `_go(+1)` (advance);
   **Esc / Back button / Android back** (`handle_back` 1st check) → `closed`
   only, stays on the current paragraph. `handle_back()` order: **view → TOC →
   peek → exit**. While open the view's background swallows reader gestures.
-- **Ellipsis**: `%EllipsisA/%EllipsisB` ("…" bottom-right inside each
-  TextViewport, outline, IGNORE) — visible only when `_overflow_of(label) > 0`
-  AND not scrolled to the end (`position.y > -overflow + 2`). Updated in
-  `_reset_label` (covers render + deferred layout), `_apply_drag`, `_wheel`,
-  `_process`. `_active_overflow()` delegates to `_overflow_of()`; in-place
-  scroll/hold/handoff unchanged (label stays full height).
+- **Ellipsis**: no dedicated nodes — the "…" is the Label's own
+  `text_overrun_behavior`, toggled per project from the Godot editor.
+  `_active_overflow()` delegates to `_overflow_of()`; in-place
+  scroll/hold unchanged (label stays full height).
 - **Hold (auto-scroll)**: finger still ≥ `HOLD_MS` (450ms) on **long text** → automatic
   scrolling at `AUTO_SCROLL_SPEED` (40px/s) in `_process`; **stops at the end of the
   paragraph** (no continuation to the next) or on release; short paragraph →

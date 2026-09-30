@@ -1,9 +1,10 @@
 extends Control
 ## Reading feed: one paragraph per screen, vertical swipe with slide.
 ## A/B panels outside the Containers (positions animated by the Tween).
-## Long paragraph: text scrolls in place (TextViewport with clip); when the
-## drag passes HANDOFF_MIN beyond the text edge, it moves to the next/prev
-## paragraph with the classic slide. Tap: no action.
+## Long paragraph: text scrolls in place (TextViewport with clip); past the
+## edge a rubber-band resists, and on release past HANDOFF_MIN it moves to
+## the next/prev paragraph with the classic slide (deadzone below it).
+## Tap: opens the view only when USE_PARAGRAPH_VIEW.
 
 signal exit_requested
 signal library_requested
@@ -11,7 +12,10 @@ signal library_requested
 const SLIDE_DURATION := 0.28
 const SWIPE_THRESHOLD := 60.0   # logical px to change paragraph (short text) (100.0)
 const DRAG_RESISTANCE := 0.35    # resistance at the edges (0 / N-1)
-const HANDOFF_MIN := 40.0        # px past the text edge to change paragraph
+const HANDOFF_MIN := 240.0        # deadzone: px past the edge (at release) → change paragraph
+const RUBBER_BAND := 0.05        # resistance of the over-scroll beyond the edge
+const RUBBER_BAND_MAX := 120.0   # max visible over-scroll (px)
+const SCROLL_SNAP_DURATION := 0.2  # rubber-band snap-back duration (s)
 const WHEEL_STEP := 80.0         # px per wheel step
 const TAP_MAX_MOVE := 15.0       # max movement for a gesture to count as a tap
 const DOUBLE_TAP_MS := 300       # double-tap window
@@ -20,6 +24,7 @@ const MULTI_JUMP_ENABLED := false  # two-finger swipe jump: code kept, disabled
 const HOLD_MS := 450             # still press to trigger auto-scroll
 const AUTO_SCROLL_SPEED := 40.0  # px/s of auto-scroll (hold)
 const PINCH_THRESHOLD := 60.0    # px of finger-distance change to fire a pinch
+const USE_PARAGRAPH_VIEW := false  # false = UX test: tap never opens the view
 
 @onready var _cover_bg: TextureRect = %CoverBg
 @onready var _panel_a: Control = %TextPanelA
@@ -74,11 +79,12 @@ var _active_text: Label
 var _idle_text: Label
 
 var _tween: Tween = null
+var _scroll_tween: Tween = null  # rubber-band snap-back of the text label
 var _dragging := false
 var _drag_start := Vector2.ZERO
 var _drag_delta := Vector2.ZERO
 var _drag_start_scroll := 0.0  # text scroll at gesture start
-var _over_drag := 0.0          # leftover past the text edge (for the handoff)
+var _over_drag := 0.0          # px past the edge (decides at release, reset there)
 var _last_tap_msec := -1000000  # last single tap (double tap → library)
 var _touch_count := 0           # active fingers (InputEventScreenTouch)
 var _multi_gesture := false     # two-finger gesture in progress
@@ -314,6 +320,7 @@ func _exit_peek() -> void:
 ## Shared setup steps: kill tween, reset drag, panel roles, cover.
 func _reset_panels() -> void:
 	_kill_tween()
+	_kill_scroll_tween()
 	_dragging = false
 	_drag_delta = Vector2.ZERO
 	_over_drag = 0.0
@@ -354,7 +361,7 @@ func _gui_input(event: InputEvent) -> void:
 			_touch_count = maxi(0, _touch_count - 1)
 			_finger_pos.erase(event.index)
 
-	# Release during the tween (handoff in progress): reset drag/hold state.
+	# Release during the tween (slide in progress): reset drag/hold state.
 	if _is_animating():
 		if (event is InputEventScreenTouch or (event is InputEventMouseButton \
 				and event.button_index == MOUSE_BUTTON_LEFT)) and not event.pressed:
@@ -412,6 +419,7 @@ func _enter_multi() -> void:
 		_drag_delta = Vector2.ZERO
 		_over_drag = 0.0
 		_snap_back()
+		_snap_scroll_back()
 
 
 ## First release under 2 fingers: evaluates the ±MULTI_JUMP skip.
@@ -510,6 +518,7 @@ func _jump(dir: int) -> void:
 
 func _begin_drag(pos: Vector2) -> void:
 	_tap_token += 1  # any new press cancels a pending tap → view open
+	_kill_scroll_tween()
 	_dragging = true
 	_drag_start = pos
 	_drag_delta = Vector2.ZERO
@@ -542,12 +551,14 @@ func _finish_drag(pos: Vector2) -> void:
 	_drag_delta = pos - _drag_start
 	var delta := _drag_delta
 	_drag_delta = Vector2.ZERO
+	var over := _over_drag  # captured before reset (scroll deadzone)
 	_over_drag = 0.0
 
 	if consumed:
 		return  # a hold is not a tap
 
 	if absf(delta.x) <= TAP_MAX_MOVE and absf(delta.y) <= TAP_MAX_MOVE:
+		_snap_scroll_back()  # a micro over-scroll during the tap relaxes back
 		_handle_tap()
 		return
 	_last_tap_msec = -1000000  # a real gesture breaks the tap sequence
@@ -559,9 +570,8 @@ func _finish_drag(pos: Vector2) -> void:
 		else:
 			_snap_back()
 	else:
-		# Long text: scroll is already clamped live; the card did not move.
-		# Paragraph change happens only via handoff during the drag.
-		_snap_back()
+		# Long text: deadzone decided on release (see _finish_scroll_gesture).
+		_finish_scroll_gesture(over)
 
 
 func _hold_cancel() -> void:
@@ -610,7 +620,8 @@ func _handle_tap() -> void:
 		library_requested.emit()
 	else:
 		_last_tap_msec = now
-		_arm_tap_open()
+		if USE_PARAGRAPH_VIEW:
+			_arm_tap_open()
 
 
 func _arm_tap_open() -> void:
@@ -644,7 +655,8 @@ func _on_paragraph_swipe_closed() -> void:
 ## Drag dy (cumulative from gesture start): >0 = finger toward the bottom.
 ## Absolute model: the target scroll derives from _drag_start_scroll, it does
 ## not sum previous events (otherwise it runs away). Scroll is consumed first,
-## then (only for short texts) the card moves.
+## then (only for short texts) the card moves. Past the edge the text yields
+## with a rubber-band; the transition is decided on release (_finish_drag).
 func _apply_drag() -> void:
 	if _is_animating():
 		return
@@ -663,17 +675,15 @@ func _apply_drag() -> void:
 		var scroll_delta := minf(-dy, overflow - _drag_start_scroll)
 		var residual := dy + scroll_delta  # ≤0 once past the bottom
 		_over_drag = residual if residual < 0.0 else 0.0
-		label.position.y = -(_drag_start_scroll + scroll_delta)
-		if _over_drag <= -HANDOFF_MIN:
-			_handoff(1)
+		var past := minf(-_over_drag * RUBBER_BAND, RUBBER_BAND_MAX)
+		label.position.y = -(_drag_start_scroll + scroll_delta + past)
 	else:
 		# toward the top: scroll shrinks down to 0
 		var scroll_delta := maxf(-dy, -_drag_start_scroll)  # ≤0
 		var residual := dy + scroll_delta  # ≥0 once past the top
 		_over_drag = residual if residual > 0.0 else 0.0
-		label.position.y = -(_drag_start_scroll + scroll_delta)
-		if _over_drag >= HANDOFF_MIN:
-			_handoff(-1)
+		var past := minf(_over_drag * RUBBER_BAND, RUBBER_BAND_MAX)
+		label.position.y = -(_drag_start_scroll + scroll_delta) + past
 
 
 func _card_drag(dy: float) -> float:
@@ -682,19 +692,60 @@ func _card_drag(dy: float) -> float:
 	return dy
 
 
-## Handoff: at the end (or the start) of the text, change paragraph.
-func _handoff(dir: int) -> void:
-	_over_drag = 0.0
-	_dragging = false
-	_drag_delta = Vector2.ZERO
-	_active_panel.position.y = 0.0
-	_go(dir)
+## Release on a scrolling paragraph (deadzone): the over-scroll accumulated
+## in the gesture decides. |over| ≥ HANDOFF_MIN → change paragraph, below it
+## the input is ignored and the text snaps back to the edge.
+func _finish_scroll_gesture(over: float) -> void:
+	var dir := 0
+	if over <= -HANDOFF_MIN:
+		dir = 1
+	elif over >= HANDOFF_MIN:
+		dir = -1
+	if dir != 0:
+		_go(dir)
+		if _is_animating():
+			_settle_scroll()  # outgoing text leaves from the clamped edge
+			return
+	_snap_scroll_back()
+
+
+## Instantly clamp the active text to the legal scroll range (no tween).
+func _settle_scroll() -> void:
+	_kill_scroll_tween()
+	var label := _active_text
+	label.position.y = clampf(label.position.y, -_active_overflow(), 0.0)
+
+
+## Rubber-band snap-back: return the text to the clamped edge after an
+## over-scroll below the deadzone (no-op when already in bounds).
+func _snap_scroll_back() -> void:
+	_kill_scroll_tween()
+	var label := _active_text
+	var overflow := _active_overflow()
+	var target := label.position.y
+	if label.position.y < -overflow - 0.5:
+		target = -overflow
+	elif label.position.y > 0.5:
+		target = 0.0
+	if is_equal_approx(target, label.position.y):
+		return
+	_scroll_tween = create_tween().bind_node(self)
+	_scroll_tween.tween_property(label, "position:y", target, SCROLL_SNAP_DURATION) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_scroll_tween.finished.connect(func() -> void: _scroll_tween = null)
+
+
+func _kill_scroll_tween() -> void:
+	if _scroll_tween != null and _scroll_tween.is_valid():
+		_scroll_tween.kill()
+	_scroll_tween = null
 
 
 func _wheel(dir: int) -> void:
 	if _is_animating() or _paragraphs.is_empty():
 		return
 	_tap_token += 1  # wheel cancels a pending tap → view open
+	_kill_scroll_tween()  # wheel input takes over from a running snap-back
 	var overflow := _active_overflow()
 	var label := _active_text
 	var scroll := -label.position.y
@@ -765,6 +816,7 @@ func _feed_jump(amount: int) -> void:
 
 func _commit(target: int, dir: int, keep_peek: bool = false) -> void:
 	var h := size.y
+	_kill_scroll_tween()
 	_idle_text.text = str(_paragraphs[target]["text"])
 	_reset_label(_idle_text)  # full height + scroll at top
 	_schedule_reset(_idle_text)
