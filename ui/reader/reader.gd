@@ -883,12 +883,12 @@ func _render_current() -> void:
 	if _bookmark_mode:
 		# Browsing bookmarks: ★ always on, counter = list position,
 		# no progress bar and no last_seq write.
-		_chapter_label.text = chapter + " ★"
+		_chapter_label.text = "★ " + chapter
 		_counter_label.text = "%d / %d" % [_seq + 1, _paragraphs.size()]
 		_progress_bar.visible = false
 		return
 	if not book_id.is_empty() and Db.is_bookmarked(book_id, int(row.get("seq", -1))):
-		chapter += " ★"
+		chapter = "★ " + chapter
 	_chapter_label.text = chapter
 	_counter_label.text = "%d / %d" % [_seq + 1, _paragraphs.size()]
 	_progress_bar.visible = true
