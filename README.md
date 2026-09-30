@@ -9,6 +9,7 @@ A epub reader and explorer for Android
 	- Scroll: scroll back and forward to change paragraph
 	- Double tap: go back to library
 	- Pinch in: toggle bookmark for the current paragraph
+	- Pinch out (scrolling bookmark): go to the paragraph in context
 	- Tab paragraph bar: open the Table of contents (TOC)
 - The reading position is saved, and you can stop to record it manually to move freely inside the book; is also saved when one tries to jump through chapters without blocking the recording of the reading position
 
