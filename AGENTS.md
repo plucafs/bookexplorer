@@ -85,6 +85,8 @@ for the feed), `delete_book(id)` (transaction, cascades bookmarks),
   Re-enable: Carousel visibility ON + Strip OFF. Hint: `visible = n>1 and _carousel.visible`.
 - Header: **"Feed"** (`%FeedButton`, hidden if 0 books) + "Open epub".
   `signal feed_requested` → main → `Db.get_random_paragraph()` → `reader.setup_feed(row)`.
+  **AppIcon double tap** (≤300ms, move ≤15px, mouse event only — touch comes
+  via emulate_mouse_from_touch) → `get_tree().quit()`, no confirmation.
 - Delete confirmation: native `DisplayServer.dialog_show`, fallback `%ConfirmDialog`.
 - Carousel tech (active only if re-enabled): slots are **visual centers**
   (`position = slot − size/2` + `pivot_offset` at center), size per **role** in

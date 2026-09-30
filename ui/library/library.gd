@@ -21,6 +21,7 @@ const SIDE_SIZE := Vector2(200, 310)
 const STRIP_ITEM_SIZE := Vector2(170, 260)  # item size in the bottom strip
 const STRIP_DRAG_THRESHOLD := 8.0  # px before a press on an item becomes a scroll drag
 const DELETE_INDEX := 0  # "Delete" button in the native dialog
+const DOUBLE_TAP_MS := 300  # window for the app-icon double tap (quit)
 
 @onready var _open_button: Button = %OpenButton
 @onready var _feed_button: Button = %FeedButton
@@ -34,6 +35,7 @@ const DELETE_INDEX := 0  # "Delete" button in the native dialog
 @onready var _scroll: ScrollContainer = %Scroll
 @onready var _book_row: HBoxContainer = %BookRow
 @onready var _confirm_dialog: ConfirmationDialog = %ConfirmDialog
+@onready var _app_icon: TextureRect = %AppIcon
 
 var _books: Array[Dictionary] = []
 var _center_index := 0
@@ -64,6 +66,10 @@ var _strip_drag_moved := false
 var _strip_drag_start := Vector2.ZERO  # global press position
 var _strip_drag_scroll0 := 0
 
+# App-icon double tap (quit): last accepted tap + its press position.
+var _icon_last_tap_msec := -1000000
+var _icon_press := Vector2.ZERO
+
 
 func _ready() -> void:
 	_open_button.pressed.connect(func() -> void: open_epub_requested.emit())
@@ -80,6 +86,22 @@ func _ready() -> void:
 	_book_right.bookmarks_requested.connect(_on_carousel_bookmarks_pressed.bind(_book_right))
 	_compute_slots()
 	_carousel.gui_input.connect(_on_carousel_input)
+	_app_icon.gui_input.connect(_on_app_icon_input)
+
+
+## Double tap on the app icon (header) closes the app. Only the mouse event
+## is handled: with emulate_mouse_from_touch a touch already produces it, and
+## counting ScreenTouch too would quit on the first tap.
+func _on_app_icon_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_icon_press = event.position
+		elif (event.position - _icon_press).length() <= TAP_MAX_MOVE:
+			var now := Time.get_ticks_msec()
+			if now - _icon_last_tap_msec <= DOUBLE_TAP_MS:
+				get_tree().quit()
+			else:
+				_icon_last_tap_msec = now
 
 
 func _notification(what: int) -> void:
