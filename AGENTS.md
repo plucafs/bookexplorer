@@ -99,12 +99,16 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
 
 ### UI flow (main.gd)
 
-- `_ready`: `Db.get_setting("last_book_id")` → valid ⇒ confirmation screen, else empty state.
+- `_ready`: no books ⇒ empty state; else if `Db.get_setting("last_book_id")` is
+  valid (book still present) ⇒ **opens the Reader directly** (position restored
+  by `setup`, back → library), otherwise the library.
 - "Open epub" button → SAF picker → import `Thread` → progress overlay → confirmation → saves `last_book_id`.
 - Import error → overlay shows the message + Close button → back to the initial state.
 - Confirmation → **"Start reading"** → Reader: loads `Db.get_paragraphs(last_book_id)` and `setup(book, paragraphs)`.
   "Library" button → carousel. **"Feed"** button → `setup_feed(random row)`.
-- `_open_reader` calls **`Db.touch_book(book_id)`** → the opened book moves to the top of `get_books()`.
+- `_open_reader` calls **`Db.set_setting("last_book_id", book_id)`** (next
+  startup reopens it) and **`Db.touch_book(book_id)`** → the opened book moves
+  to the top of `get_books()`.
 - Android back (`set_quit_on_go_back(false)` + `NOTIFICATION_WM_GO_BACK_REQUEST` in main.gd):
   from Reader → source screen (`_reader_return`); from confirmation → library; anywhere else quits.
   Escape (desktop) from Reader → `exit_requested` → same path.

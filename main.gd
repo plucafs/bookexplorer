@@ -48,10 +48,16 @@ func _notification(what: int) -> void:
 
 
 func _show_initial_state() -> void:
-	if not Db.get_books().is_empty():
-		_set_screen(_library)
+	if Db.get_books().is_empty():
+		_set_screen(_empty_state)
 		return
-	_set_screen(_empty_state)
+	# Open the last read book directly (position restored by reader.setup);
+	# back from the reader returns to the library.
+	var last := Db.get_setting("last_book_id")
+	if not last.is_empty() and not Db.get_book(last).is_empty():
+		_open_reader(last, _library)
+		return
+	_set_screen(_library)
 
 
 func _set_screen(screen: Control) -> void:
@@ -118,6 +124,7 @@ func _open_reader(book_id: String, return_to: Control) -> void:
 	if paragraphs.is_empty():
 		push_error("main: no paragraphs for '%s'" % book_id)
 		return
+	Db.set_setting("last_book_id", book_id)  # next startup reopens this book
 	Db.touch_book(book_id)  # opened book → top of the library list
 	_reader_return = return_to
 	_reader.setup(book, paragraphs)
