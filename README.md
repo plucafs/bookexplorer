@@ -14,6 +14,9 @@ An Android epub reader and explorer
 - The reading position is saved, and you can stop to record it manually to move freely inside the book; is also saved when one tries to jump through chapters without blocking the recording of the reading position
 
 ## Screenshot
+|Library|Import|Reading|
+|-|-|-|
+|![screenshot](media/3.png) | ![screenshot](media/2.png) |![screenshot](media/4.png)|
 
 
 ## Download
