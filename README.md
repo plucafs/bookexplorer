@@ -2,7 +2,7 @@
 An Android epub reader and explorer
 
 ## Features
-- Read EPUB files scrolling through the paragraphs a là TikTok/Reels
+- Read EPUB files scrolling through the paragraphs a là TikTok/Instagram Reels
 - Feed mode: scroll through random paragraphs picked from your imported EPUBs
 - Bookmark paragraphs and scroll through them
 - Reading gestures
