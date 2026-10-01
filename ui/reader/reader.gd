@@ -91,6 +91,8 @@ var _multi_gesture := false     # two-finger gesture in progress
 var _multi_dx := 0.0            # accumulated dx of the multi gesture
 var _feed_mode := false         # random feed: fetch at end of history, no last_seq
 var _feed_last_id := -1         # id of last shown paragraph (anti-repeat)
+var _feed_history: Array[Dictionary] = []  # feed saved while peeking its context
+var _feed_seq := 0              # feed position to restore on back
 var _finger_down := false       # finger down (for the hold)
 var _hold_start_msec := -1      # when the finger landed (hold)
 var _hold_armed := false        # auto-scroll running
@@ -112,6 +114,8 @@ func _reset_session_state() -> void:
 	_no_save = false
 	_toc_return_seq = -1
 	_toc_return_mode = 0
+	_feed_history.clear()
+	_feed_seq = 0
 	_counter_label.modulate = Color.WHITE
 
 
@@ -208,6 +212,10 @@ func _jump_to_seq(target: int) -> void:
 			return
 		if _bookmark_mode:
 			_bookmark_return_seq = _seq
+		if _feed_mode:
+			# TOC jump from the feed: keep it restorable on back.
+			_feed_history = _paragraphs
+			_feed_seq = _seq
 		_feed_mode = false
 		_bookmark_mode = false
 		_paragraphs = all
@@ -291,7 +299,7 @@ func setup_bookmarks(
 
 
 ## Android back / Escape: close the TOC first, then leave a peek (back to
-## the bookmark list); otherwise let the caller exit the reader.
+## the bookmark list or to the feed); otherwise let the caller exit.
 func handle_back() -> bool:
 	if _paragraph_view.is_open():
 		_paragraph_view.close()  # stays on the current paragraph (no advance)
@@ -307,6 +315,16 @@ func handle_back() -> bool:
 
 func _exit_peek() -> void:
 	_peek = false
+	if not _feed_history.is_empty():
+		_paragraphs = _feed_history
+		_seq = clampi(_feed_seq, 0, _paragraphs.size() - 1)
+		_feed_history = []
+		_all_paragraphs.clear()  # never reuse another book's list in the feed
+		_bookmark_mode = false
+		_feed_mode = true
+		_reset_panels()
+		_render_current()
+		return
 	_paragraphs = _bookmark_paragraphs
 	if _paragraphs.is_empty():
 		library_requested.emit()
@@ -459,9 +477,10 @@ func _update_pinch() -> void:
 
 
 ## Pinch closed (fingers together): toggle a bookmark on the current
-## paragraph. Not in feed mode; in bookmark mode it leaves the list.
+## paragraph (normal, feed and bookmark mode); in bookmark mode removing
+## the bookmark being browsed leaves the list.
 func _on_pinch_close() -> void:
-	if _feed_mode or _paragraphs.is_empty() or _book.is_empty():
+	if _paragraphs.is_empty() or _book.is_empty():
 		return
 	var book_id := str(_book.get("id", ""))
 	if book_id.is_empty():
@@ -482,10 +501,16 @@ func _on_pinch_close() -> void:
 	_render_current()  # refresh ★ (no last_seq write while peek/bookmark)
 
 
-## Pinch open (fingers apart) while browsing bookmarks: show the paragraph
-## inside the full book WITHOUT touching the saved reading position.
+## Pinch open (fingers apart): show the paragraph inside the full book
+## WITHOUT touching the saved reading position. From the bookmarks and
+## from the feed (whose history is kept for the back gesture).
 func _on_pinch_open() -> void:
-	if not _bookmark_mode or _paragraphs.is_empty() or _all_paragraphs.is_empty():
+	if _paragraphs.is_empty():
+		return
+	if _feed_mode:
+		_open_feed_context()
+		return
+	if not _bookmark_mode or _all_paragraphs.is_empty():
 		return
 	var want := int(_paragraphs[_seq].get("seq", -1))
 	var idx := -1
@@ -500,6 +525,35 @@ func _on_pinch_open() -> void:
 	_seq = idx
 	_bookmark_mode = false
 	_peek = true
+	_render_current()
+
+
+## Pinch open in the feed: switch to the reader mode with the full book at
+## the current paragraph (peek, no last_seq write). The feed history stays
+## in _feed_history so handle_back can restore it.
+func _open_feed_context() -> void:
+	var row: Dictionary = _paragraphs[_seq]
+	var book_id := str(row.get("book_id", ""))
+	var all := Db.get_paragraphs(book_id)
+	if all.is_empty():
+		push_error("reader._open_feed_context: no paragraphs for '%s'" % book_id)
+		return
+	var want := int(row.get("seq", -1))
+	var idx := -1
+	for i: int in all.size():
+		if int(all[i].get("seq", -1)) == want:
+			idx = i
+			break
+	if idx < 0:
+		return
+	_feed_history = _paragraphs
+	_feed_seq = _seq
+	_paragraphs = all
+	_all_paragraphs = all
+	_seq = idx
+	_feed_mode = false
+	_peek = true
+	_reset_panels()
 	_render_current()
 
 
@@ -838,6 +892,7 @@ func _on_commit_finished(target: int, keep_peek: bool = false) -> void:
 	_seq = target
 	if not keep_peek:
 		_peek = false  # a normal swipe away from a peek resumes tracking
+		_feed_history = []  # committed: back no longer returns to the feed
 	var swap_panel := _active_panel
 	_active_panel = _idle_panel
 	_idle_panel = swap_panel
@@ -865,7 +920,10 @@ func _render_current() -> void:
 	if _feed_mode:
 		# Feed: the paragraph's book title, counter = steps taken,
 		# no progress and no last_seq persistence.
-		_chapter_label.text = str(row.get("title", ""))
+		var title := str(row.get("title", ""))
+		if Db.is_bookmarked(str(row.get("book_id", "")), int(row.get("seq", -1))):
+			title += " ★"
+		_chapter_label.text = title
 		_counter_label.text = "%d" % (_seq + 1)
 		_progress_bar.visible = false
 		_book = {

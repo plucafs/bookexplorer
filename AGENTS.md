@@ -168,19 +168,24 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
   exactly 2 fingers): `_enter_multi` records `_pinch_base_dist`; during multi-drag
   `_update_pinch` fires when distance changes ≥ `PINCH_THRESHOLD` (60px), sets
   `_pinch_consumed` (gesture eaten once). **Pinch closed** → `Db.toggle_bookmark`
-  on the current paragraph (not in feed mode) + ` ★` feedback on the chapter label;
-  in bookmark mode a removal rebuilds the list (empty → library). **Pinch open**
-  → only in bookmark mode: peek into `_all_paragraphs` at that seq
-  (`_peek=true`, `_bookmark_mode=false`, `_bookmark_return_seq` saved).
+  on the current paragraph (not in feed mode: **also in feed**, ` ★` feedback on
+  the chapter label/title); in bookmark mode a removal rebuilds the list
+  (empty → library). **Pinch open** → in bookmark mode: peek into
+  `_all_paragraphs` at that seq (`_peek=true`, `_bookmark_mode=false`,
+  `_bookmark_return_seq` saved); **in feed mode** → `_open_feed_context()`:
+  loads `Db.get_paragraphs(row.book_id)`, saves `_feed_history`/`_feed_seq`,
+  switches to the full book as a peek (no `last_seq`).
 - **Bookmark mode** (`setup_bookmarks(book, bookmarks, all)`): `_paragraphs` =
   bookmark list, counter `i / N`, chapter label = chapter + ` ★`, progress bar hidden,
   **no `last_seq` write**; navigation clamps to the list (snap at edges).
 - **Peek** (`_peek`): renders the full book at the bookmark WITHOUT writing
-  `last_seq` (same guard style as feed); any `_commit` clears `_peek` and saves
+  `last_seq` (same guard style as feed); any `_commit` clears `_peek` **and
+  `_feed_history`** (swipe = commit, also from the feed context) and saves
   normally from then on (`keep_peek=true` on `_commit` preserves it — used by
   TOC jumps while peeking). `handle_back()` order: **1) TOC open → close**,
-  **2) peek → bookmark list** (`_exit_peek`), else false (caller exits);
-  main.gd GO_BACK and Escape call it first. Double tap still goes to library.
+  **2) peek → feed if `_feed_history` else bookmark list** (`_exit_peek`),
+  else false (caller exits); main.gd GO_BACK and Escape call it first.
+  Double tap still goes to library.
 - **TOC** (`ui/toc/toc.tscn`, `class_name TocPanel`, composed in `reader.tscn`
   as last child, hidden): opened by **both** `%TocBarButton` (transparent,
   top chapter bar y 0–80) and `%CounterBarButton` (bottom counter area,
@@ -221,9 +226,13 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
 - **Feed mode** (`setup_feed(row)`): `_paragraphs` = growing feed history,
   `_seq` = position; at end of history `_go(+1)` runs `_fetch_feed_row()`
   (`Db.get_random_paragraph(exclude last_id)`, max 3 attempts). Dedicated render:
-  chapter label = **book title** of the paragraph, counter = steps taken,
-  progress bar hidden, **no `last_seq` write**, cover updated from the
-  row (`book_id`+`cover`). Exit: back/double tap → library (`_reader_return`).
+  chapter label = **book title** of the paragraph (+ ` ★` when bookmarked),
+  counter = steps taken, progress bar hidden, **no `last_seq` write**, cover
+  updated from the row (`book_id`+`cover`). **Pinch in** = bookmark on the row;
+  **pinch out** = `_open_feed_context()` (full book peek); **back** →
+  `_exit_peek` restores the feed (`_feed_history`/`_feed_seq`); a swipe in the
+  context commits it (history cleared). Exit: back/double tap → library
+  (`_reader_return`).
 - Bookmark entry from the star: `_reader_return = _library`, `touch_book` runs,
   `last_seq` untouched until the user navigates normally.
 - Paragraph view (`ui/paragraph_view/`): **wired** — tap (delayed) opens it,
