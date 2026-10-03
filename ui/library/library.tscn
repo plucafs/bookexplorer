@@ -84,11 +84,12 @@ size_flags_vertical = 3
 [node name="AppIcon" type="TextureRect" parent="VBoxContainer" unique_id=356370934]
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.24705882)
+clip_contents = true
 layout_mode = 2
 size_flags_vertical = 3
 texture = ExtResource("2_222sl")
 expand_mode = 1
-stretch_mode = 1
+stretch_mode = 3
 
 [node name="EmptyLabel" type="Label" parent="VBoxContainer" unique_id=2080409449]
 unique_name_in_owner = true
