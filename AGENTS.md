@@ -206,10 +206,18 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
   basename processing in the UI).
   **List drag-to-scroll** (items are Buttons: per-item `gui_input`, absolute
   model in global coords, `DRAG_THRESHOLD`=8px; a release after a drag is
-  swallowed). **Pull-down dismiss** (`DISMISS_THRESHOLD`=80px down): on the
+  swallowed).   **Sensitivity**: `SCROLL_SENSITIVITY` (drag px → scroll px,
+  kept in sync with the copy in `library.gd`). **Edge re-anchor**: on clamp `anchor`/`anchor0`
+  snap to the position while `_drag_start`/`_drag_scroll0` keep the original
+  press (the pull-down dismiss measures dy from the press and must not reset).
+  **Pull-down dismiss** (`DISMISS_THRESHOLD`=80px down): on the
   list when `scroll_vertical==0` at press, and on the **Dim** (the Panel
   margins, incl. below the search, fall through to it; Dim tap = close on
   release without movement, horizontal drag does not close).
+  **`TocScroll`** (band between list and search, 64px, copy of `LibraryScroll`
+  rotated to 0°: ColorRect child = `mouse_filter=IGNORE`): vertical drag
+  scrolls the list (`_on_toc_scroll_gui_input`, same absolute model +
+  re-anchor + `SCROLL_SENSITIVITY` as the library copy).
   **`SaveToggleButton`** (header, next to ✕): session-only no-save mode —
   `save_toggle_requested` → `reader._no_save`; amber `_counter_label.modulate`
   while active; `_render_current` guard `if not _peek and not _no_save`.

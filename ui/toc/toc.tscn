@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://cqlw0bpx03hfm"]
 
 [ext_resource type="Script" uid="uid://bw5g7hse1xm06" path="res://ui/toc/toc.gd" id="1_toc"]
+[ext_resource type="Texture2D" uid="uid://c6l1ehq4f3m1n" path="res://icons/scroll.svg" id="2_scroll"]
 
 [node name="Toc" type="Control" unique_id=213129947]
 visible = false
@@ -55,6 +56,8 @@ vertical_alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 3
+vertical_scroll_mode = 3
 
 [node name="List" type="VBoxContainer" parent="Panel/VBox/Scroll" unique_id=1550918732]
 unique_name_in_owner = true
@@ -62,16 +65,21 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Panel/VBox" unique_id=139706692]
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBox" unique_id=379551460]
 layout_mode = 2
 
-[node name="Search" type="LineEdit" parent="Panel/VBox/VBoxContainer" unique_id=435782757]
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/VBox/HBoxContainer" unique_id=139706692]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Search" type="LineEdit" parent="Panel/VBox/HBoxContainer/VBoxContainer" unique_id=435782757]
 unique_name_in_owner = true
+visible = false
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 placeholder_text = "Search chapters…"
 
-[node name="SaveToggleButton" type="Button" parent="Panel/VBox/VBoxContainer" unique_id=266108094]
+[node name="SaveToggleButton" type="Button" parent="Panel/VBox/HBoxContainer/VBoxContainer" unique_id=266108094]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 48)
 layout_mode = 2
@@ -79,7 +87,7 @@ theme_override_font_sizes/font_size = 15
 text = "Save position: ON"
 flat = true
 
-[node name="CloseButton" type="Button" parent="Panel/VBox/VBoxContainer" unique_id=801128986]
+[node name="CloseButton" type="Button" parent="Panel/VBox/HBoxContainer/VBoxContainer" unique_id=801128986]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
@@ -87,7 +95,7 @@ theme_override_font_sizes/font_size = 20
 text = "✕"
 flat = true
 
-[node name="ReturnButton" type="Button" parent="Panel/VBox/VBoxContainer" unique_id=1353887357]
+[node name="ReturnButton" type="Button" parent="Panel/VBox/HBoxContainer/VBoxContainer" unique_id=1353887357]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 48)
@@ -95,3 +103,38 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 15
 flat = true
 text_overrun_behavior = 4
+
+[node name="TocScroll" type="Control" parent="Panel/VBox/HBoxContainer" unique_id=1391262112]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+
+[node name="ColorRect" type="ColorRect" parent="Panel/VBox/HBoxContainer/TocScroll" unique_id=865731129]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TextureRect" type="TextureRect" parent="Panel/VBox/HBoxContainer/TocScroll" unique_id=1391262113]
+modulate = Color(1, 1, 1, 0.49803922)
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(16.183105, 16.34436)
+mouse_filter = 2
+texture = ExtResource("2_scroll")
+expand_mode = 1
