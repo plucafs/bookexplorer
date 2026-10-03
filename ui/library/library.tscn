@@ -75,6 +75,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Spacer2" type="Control" parent="VBoxContainer" unique_id=1675449223]
+visible = false
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -82,8 +83,10 @@ size_flags_vertical = 3
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.24705882)
 layout_mode = 2
+size_flags_vertical = 3
 texture = ExtResource("2_222sl")
-expand_mode = 4
+expand_mode = 1
+stretch_mode = 1
 
 [node name="EmptyLabel" type="Label" parent="VBoxContainer" unique_id=2080409449]
 unique_name_in_owner = true
@@ -155,6 +158,7 @@ layout_mode = 2
 theme_override_constants/separation = 12
 
 [node name="Spacer" type="Control" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=1317621411]
+visible = false
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 
