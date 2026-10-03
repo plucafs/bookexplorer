@@ -20,7 +20,7 @@ An Android epub reader and explorer
 
 
 ## Download
-[Android](https://github.com/plucafs/bookexplorer/releases/download/v0.1.0/bookexplorer-android.apk)
+[Android](https://github.com/plucafs/bookexplorer/releases/download/v0.1.1/bookexplorer-android.apk)
 
 ## Credits
 - [Godot](https://github.com/phiresky/ripgrep-all)
