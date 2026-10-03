@@ -1,20 +1,17 @@
 [gd_scene format=3 uid="uid://b6h8av8375nax"]
 
 [ext_resource type="Script" uid="uid://cqt7g3f5sl4mn" path="res://ui/reader/reader.gd" id="1_reader"]
-[ext_resource type="Gradient" uid="uid://ireawt1csxjb" path="res://gradient.tres" id="2_fi5ui"]
+[ext_resource type="Gradient" uid="uid://ireawt1csxjb" path="res://themes/gradient.tres" id="2_fi5ui"]
 [ext_resource type="Theme" uid="uid://dlpcwhdihbx66" path="res://themes/reader_theme.tres" id="3_dj17l"]
 [ext_resource type="PackedScene" uid="uid://cqlw0bpx03hfm" path="res://ui/toc/toc.tscn" id="4_toc"]
 [ext_resource type="PackedScene" uid="uid://cyuw6krasafba" path="res://ui/paragraph_view/paragraph_view.tscn" id="5_pview"]
+[ext_resource type="StyleBox" uid="uid://sme7po7s1kxf" path="res://themes/sep_line.tres" id="6_o2d3u"]
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_k5vtu"]
 gradient = ExtResource("2_fi5ui")
 fill_from = Vector2(0.5, 1)
 fill_to = Vector2(0.5, 0)
 metadata/_snap_enabled = true
-
-[sub_resource type="StyleBoxLine" id="StyleBoxLine_fi5ui"]
-color = Color(0.096811466, 0.09681145, 0.09681145, 1)
-thickness = 2
 
 [node name="Reader" type="Control" unique_id=1995808848]
 layout_mode = 3
@@ -214,4 +211,4 @@ offset_top = 86.0
 offset_bottom = 90.0
 grow_horizontal = 2
 theme_override_constants/separation = 2
-theme_override_styles/separator = SubResource("StyleBoxLine_fi5ui")
+theme_override_styles/separator = ExtResource("6_o2d3u")

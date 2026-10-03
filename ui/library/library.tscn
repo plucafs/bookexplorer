@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bvwe27bwdj4tn" path="res://ui/library/library.gd" id="1_lib"]
 [ext_resource type="Texture2D" uid="uid://stwe1aklrgix" path="res://icon.png" id="2_222sl"]
 [ext_resource type="PackedScene" uid="uid://bde8ohbhflxb6" path="res://ui/library/library_item.tscn" id="2_item"]
+[ext_resource type="StyleBox" uid="uid://sme7po7s1kxf" path="res://themes/sep_line.tres" id="4_0bjko"]
 [ext_resource type="Texture2D" uid="uid://c6l1ehq4f3m1n" path="res://icons/scroll.svg" id="4_obefe"]
 
 [node name="Library" type="Control" unique_id=417037583]
@@ -150,6 +151,7 @@ theme_override_constants/separation = 12
 
 [node name="HSeparator" type="HSeparator" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=1379595374]
 layout_mode = 2
+theme_override_styles/separator = ExtResource("4_0bjko")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=793058065]
 layout_mode = 2
