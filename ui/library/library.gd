@@ -20,6 +20,7 @@ const CENTER_SIZE := Vector2(260, 400)
 const SIDE_SIZE := Vector2(200, 310)
 const STRIP_ITEM_SIZE := Vector2(170, 260)  # item size in the bottom strip
 const STRIP_DRAG_THRESHOLD := 8.0  # px before a press on an item becomes a scroll drag
+const SCROLL_SENSITIVITY := 2.0  # drag px → scroll px (>1 scrolls faster than the finger)
 const DELETE_INDEX := 0  # "Delete" button in the native dialog
 const DOUBLE_TAP_MS := 300  # window for the app-icon double tap (quit)
 
@@ -36,6 +37,7 @@ const DOUBLE_TAP_MS := 300  # window for the app-icon double tap (quit)
 @onready var _book_row: HBoxContainer = %BookRow
 @onready var _confirm_dialog: ConfirmationDialog = %ConfirmDialog
 @onready var _app_icon: TextureRect = %AppIcon
+@onready var _library_scroll: Control = %LibraryScroll
 
 var _books: Array[Dictionary] = []
 var _center_index := 0
@@ -66,6 +68,12 @@ var _strip_drag_moved := false
 var _strip_drag_start := Vector2.ZERO  # global press position
 var _strip_drag_scroll0 := 0
 
+# LibraryScroll drag: horizontal swipes on the empty area under the strip
+# scroll the strip (absolute model; the node itself never moves).
+var _lib_drag_on := false
+var _lib_drag_start := Vector2.ZERO  # local press position
+var _lib_drag_scroll0 := 0
+
 # App-icon double tap (quit): last accepted tap + its press position.
 var _icon_last_tap_msec := -1000000
 var _icon_press := Vector2.ZERO
@@ -87,6 +95,7 @@ func _ready() -> void:
 	_compute_slots()
 	_carousel.gui_input.connect(_on_carousel_input)
 	_app_icon.gui_input.connect(_on_app_icon_input)
+	_library_scroll.gui_input.connect(_on_library_scroll_gui_input)
 
 
 ## Double tap on the app icon (header) closes the app. Only the mouse event
@@ -273,7 +282,40 @@ func _on_strip_item_gui_input(event: InputEvent, item: Button) -> void:
 		var dx := global_pos.x - _strip_drag_start.x
 		if absf(dx) > STRIP_DRAG_THRESHOLD:
 			_strip_drag_moved = true
-			_scroll.scroll_horizontal = _strip_drag_scroll0 - int(dx)
+			var target := _strip_drag_scroll0 - int(dx * SCROLL_SENSITIVITY)
+			_scroll.scroll_horizontal = target
+			var actual := _scroll.scroll_horizontal
+			if actual != target:
+				# Edge hit: re-anchor (same dead-zone fix as LibraryScroll).
+				_strip_drag_scroll0 = actual
+				_strip_drag_start.x = global_pos.x
+
+
+## Horizontal drag on the LibraryScroll area (under the strip) scrolls the
+## strip in the direction of the gesture: finger right → dx > 0 → scroll
+## value drops → the covers slide right, following the finger.
+## Mouse events only: emulate_mouse_from_touch turns a touch into them
+## (same convention as the app-icon and strip-item handlers).
+func _on_library_scroll_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_lib_drag_on = true
+			_lib_drag_start = event.position
+			_lib_drag_scroll0 = _scroll.scroll_horizontal
+		else:
+			_lib_drag_on = false
+		return
+	if _lib_drag_on and event is InputEventMouseMotion \
+			and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		var dx: float = event.position.x - _lib_drag_start.x
+		var target := _lib_drag_scroll0 - int(dx * SCROLL_SENSITIVITY)
+		_scroll.scroll_horizontal = target
+		var actual := _scroll.scroll_horizontal
+		if actual != target:
+			# Edge hit: re-anchor, else the whole travelled distance past the
+			# end would be a dead zone and reversing the finger feels stuck.
+			_lib_drag_scroll0 = actual
+			_lib_drag_start.x = event.position.x
 
 
 ## Carousel input: horizontal drag + tap.

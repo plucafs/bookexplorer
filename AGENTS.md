@@ -78,7 +78,13 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
   `bookmarks_requested(book_id)` → main → `reader.setup_bookmarks(book, bookmarks, all)`.
   **Drag on the covers scrolls the row** (custom `gui_input` per item, absolute
   model in global coords, threshold `STRIP_DRAG_THRESHOLD`=8px; a release after
-  a drag is swallowed and does not open).
+  a drag is swallowed and does not open). **Sensitivity**: `SCROLL_SENSITIVITY`
+  (drag px → scroll px, 1.0 = 1:1). **Edge re-anchor**: when the value is
+  clamped, `scroll0`/`start` snap to the current position, else the whole
+  travelled distance past the end would be a dead zone ("can't go back").
+  **`LibraryScroll`** (area under the strip, ColorRect child = `mouse_filter=IGNORE`):
+  horizontal drag scrolls the row the same way (`_on_library_scroll_gui_input`,
+  same absolute model + re-anchor, local coords — the node never moves).
   0 books → Strip hidden + `%EmptyLabel`. Scroll reset to 0 on every refresh.
 - **Carousel: KEPT BUT HIDDEN** (`%Carousel.visible=false`, same for SwipeHint):
   code intact (`_compute_slots`, `_swipe_to`, node rotation, tap hit-test…),
