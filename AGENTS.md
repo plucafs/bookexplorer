@@ -261,6 +261,7 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
 ## Android notes
 
 - Portrait orientation already set in `project.godot` (`window/handheld/orientation=1`), renderer `gl_compatibility`, ETC2/ASTC enabled.
+- **Scaling**: `window/stretch/mode="canvas_items"` + `aspect="expand"` + `scale=2.0`, base 720×1280 → all sizes are design px, same relative size on every device (mode was missing → `disabled` → size varied with phone resolution; `content_scale_factor` applies in *all* modes — `window.cpp` divides the viewport by it even when disabled). `scale` is the global zoom knob: text width ≈ `28·scale/720` of screen width (2.0 → 7.8%, same as the original `disabled`+`scale=3.0` on a 1080px phone); to match the old look on a device exactly: `scale = 2160 / screen_width_px`. `_apply_safe_area` maps native px → canvas via `viewport/screen`.
 - Critical UI (button, confirmation) respects `DisplayServer.get_display_safe_area()`, touch targets ≥ 44px.
 - No storage permission required (SAF). DB always in `user://` (Android forbids writing to `res://`).
 

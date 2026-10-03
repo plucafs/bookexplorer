@@ -74,6 +74,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="Spacer2" type="Control" parent="VBoxContainer" unique_id=1675449223]
+layout_mode = 2
+size_flags_vertical = 3
+
 [node name="AppIcon" type="TextureRect" parent="VBoxContainer" unique_id=356370934]
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.24705882)
@@ -92,6 +96,7 @@ vertical_alignment = 1
 
 [node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=645652854]
 layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/margin_left = 8
 theme_override_constants/margin_right = 8
 

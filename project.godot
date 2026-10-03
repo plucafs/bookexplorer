@@ -26,8 +26,9 @@ Db="*res://common/db.gd"
 
 window/size/viewport_width=720
 window/size/viewport_height=1280
+window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/stretch/scale=3.0
+window/stretch/scale=1.7
 window/handheld/orientation=1
 window/ios/hide_home_indicator=false
 window/ios/hide_status_bar=false
