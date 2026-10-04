@@ -159,10 +159,6 @@ func _on_tree_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 		var dx: float = event.position.x - _press_pos.x
 		var dy: float = event.position.y - _press_pos.y
-		if _press_scroll_y <= 0.0 and dy > DISMISS_THRESHOLD:
-			_drag_moved = true  # swallow the pending release tap
-			close_requested.emit()
-			return
 		if absf(dx) > DRAG_THRESHOLD or absf(dy) > DRAG_THRESHOLD:
 			_drag_moved = true
 
