@@ -3,8 +3,13 @@
 [ext_resource type="Script" uid="uid://bw5g7hse1xm06" path="res://ui/toc/toc.gd" id="1_toc"]
 [ext_resource type="Texture2D" uid="uid://c6l1ehq4f3m1n" path="res://icons/scroll.svg" id="2_scroll"]
 
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_panel"]
+resource_name = "StyleBoxEmpty"
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_sel"]
+resource_name = "StyleBoxEmpty"
+
 [node name="Toc" type="Control" unique_id=213129947]
-visible = false
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -52,18 +57,21 @@ theme_override_font_sizes/font_size = 22
 text = "Contents"
 vertical_alignment = 1
 
-[node name="Scroll" type="ScrollContainer" parent="Panel/VBox" unique_id=2096381125]
+[node name="Tree" type="Tree" parent="Panel/VBox" unique_id=1483927711]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-horizontal_scroll_mode = 3
-vertical_scroll_mode = 3
-
-[node name="List" type="VBoxContainer" parent="Panel/VBox/Scroll" unique_id=1550918732]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 4
+focus_mode = 0
+theme_override_constants/inner_item_margin_bottom = 12
+theme_override_constants/inner_item_margin_left = 12
+theme_override_constants/inner_item_margin_top = 12
+theme_override_constants/item_margin = 16
+theme_override_font_sizes/font_size = 17
+theme_override_styles/panel = SubResource("StyleBoxEmpty_panel")
+theme_override_styles/selected = SubResource("StyleBoxEmpty_sel")
+theme_override_styles/selected_focus = SubResource("StyleBoxEmpty_sel")
+hide_root = true
+scroll_horizontal_enabled = false
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBox" unique_id=379551460]
 layout_mode = 2

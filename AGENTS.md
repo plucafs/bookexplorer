@@ -35,7 +35,7 @@ books(id TEXT PRIMARY KEY /*dc:identifier, fallback filename hash*/, title, auth
 paragraphs(id INTEGER PK AUTOINCREMENT, book_id, seq INT, chapter, text);
 settings(key TEXT PK, value TEXT);  -- last_book_id
 bookmarks(id INTEGER PK AUTOINCREMENT, book_id, seq INT, created_at INT, UNIQUE(book_id, seq));
-toc_entries(id INTEGER PK AUTOINCREMENT, book_id, seq INT, title TEXT);  -- real epub TOC
+toc_entries(id INTEGER PK AUTOINCREMENT, book_id, seq INT, title TEXT, depth INT);  -- real epub TOC (nested)
 ```
 
 Addon: `addons/godot-sqlite` (GDExtension, class `SQLite`: `open_db`, `query`, `query_with_bindings`, `query_result`).
@@ -46,8 +46,10 @@ for the feed; skips text shorter than `FEED_MIN_TEXT_LENGTH` = 100 chars, one
 unfiltered fallback attempt for short-only books), `delete_book(id)` (transaction, cascades bookmarks),
 `toggle_bookmark(book_id, seq) -> bool` (add/remove, returns new state),
 `is_bookmarked(book_id, seq)`, `get_bookmarked_paragraphs(book_id)` (JOIN paragraphs, ORDER BY seq),
-`get_toc(book_id)` → `[{title, seq}]` — **title is display-ready**: rows from
+`get_toc(book_id)` → `[{title, seq, depth}]` — **title is display-ready**: rows from
 `toc_entries` (epub nav/NCX), else fallback = chapter href basename or `—`.
+`depth` = nesting level (0 = top). Column added via `ALTER TABLE` migration in
+`open_connection()` (`_migrate`) — older DBs get all rows at depth 0 (flat until re-import).
 
 ### Import pipeline (EpubImporter)
 
@@ -57,12 +59,16 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
 4. Cover: manifest item `properties` containing `cover-image`, or `meta[name=cover]`.
 5. For each spine html/xhtml item: XML parse, skip `head/script/style`, flush paragraphs on block tags (`p`,`h1-h6`,`li`,`blockquote`,`pre`,`figcaption`,…), filter empties, global `seq`.
 6. **Real TOC** (`_collect_toc`): EPUB3 nav (`properties~"nav"`, `_parse_nav` picks the
-   `<nav epub:type~"toc">` else the first nav, `<a>` titles incl. nested tags) →
-   EPUB2 NCX (`<spine toc>`, `_parse_nav`/`_parse_ncx` navPoints in start order)
+   `<nav epub:type~"toc">` else the first nav, `<a>` titles incl. nested tags,
+   **depth = `<ol>` nesting**) →
+   EPUB2 NCX (`<spine toc>`, `_parse_nav`/`_parse_ncx` navPoints in start order,
+   **depth = open navPoint stack size**, captured before the push)
    → none. hrefs resolved vs the nav/NCX file dir (fragments stripped via
    `_resolve_href`); mapped to the first paragraph seq of that chapter_href;
-   empty title → href basename; dedupe by seq; hrefs without paragraphs dropped.
-   Persisted as `toc_entries` in the same transaction (re-import DELETEs first).
+   empty title → href basename; **dedupe by `seq|title`** (a fragment child of
+   the same file keeps its row → jumps to the chapter start); hrefs without
+   paragraphs dropped. Output is **pre-order** (parent before children).
+   Persisted as `toc_entries` (with depth) in the same transaction (re-import DELETEs first).
 7. Malformed XHTML → regex strip-tag fallback + `push_error`, the import continues.
 8. Re-import same id → DELETE of the existing book/paragraphs/toc_entries before the insert (transaction).
 
@@ -200,24 +206,32 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
   as last child, hidden): opened by **both** `%TocBarButton` (transparent,
   top chapter bar y 0–80) and `%CounterBarButton` (bottom counter area,
   −96…−16). Overlay `mouse_filter=STOP` blocks reader gestures.
-  Rows = `toc_item.tscn` buttons (56px, `chapter_selected(seq)`), current
-  chapter in gold; **LineEdit "Search chapters…"** at the bottom filters rows
-  case-insensitively. Entry titles are display-ready (`entry.title`, no
-  basename processing in the UI).
-  **List drag-to-scroll** (items are Buttons: per-item `gui_input`, absolute
-  model in global coords, `DRAG_THRESHOLD`=8px; a release after a drag is
-  swallowed).   **Sensitivity**: `SCROLL_SENSITIVITY` (drag px → scroll px,
-  kept in sync with the copy in `library.gd`). **Edge re-anchor**: on clamp `anchor`/`anchor0`
-  snap to the position while `_drag_start`/`_drag_scroll0` keep the original
-  press (the pull-down dismiss measures dy from the press and must not reset).
-  **Pull-down dismiss** (`DISMISS_THRESHOLD`=80px down): on the
-  list when `scroll_vertical==0` at press, and on the **Dim** (the Panel
+  Rows = a **`Tree`** (`%Tree`: hide_root, focus_mode=0, panel/selected
+  styleboxes empty, ~52px rows): nested chapters from `depth` (pre-order
+  rebuild with a parent stack, `set_metadata(0, seq)`); **parents collapsed by
+  default**, path to the current chapter expanded + `scroll_to_item(current)`
+  one frame after open; current chapter gold via `set_custom_color`.
+  Entry titles are display-ready (`entry.title`, no basename processing).
+  **Tap is release-based** (`_on_tree_input` on the `gui_input` signal — the
+  signal fires BEFORE the Tree consumes the event): press snapshots
+  item/collapsed/scroll, release within `DRAG_THRESHOLD`=8px on the same row →
+  `chapter_selected(seq)`; a fold flip (the Tree toggles `collapsed` at
+  PRESS) or a release on another row is not a tap; release below the rows →
+  `close_requested`.
+  Rows scroll **natively** (Tree touch drag + inertia, 1:1 — no sensitivity
+  knob nor edge re-anchor on the rows; `SCROLL_SENSITIVITY` drives only the
+  band). **Pull-down dismiss** (`DISMISS_THRESHOLD`=80px down): on the
+  tree when `get_scroll().y==0` at press, and on the **Dim** (the Panel
   margins, incl. below the search, fall through to it; Dim tap = close on
   release without movement, horizontal drag does not close).
-  **`TocScroll`** (band between list and search, 64px, copy of `LibraryScroll`
-  rotated to 0°: ColorRect child = `mouse_filter=IGNORE`): vertical drag
-  scrolls the list (`_on_toc_scroll_gui_input`, same absolute model +
-  re-anchor + `SCROLL_SENSITIVITY` as the library copy).
+  **`TocScroll`** (band with the scroll icon, ColorRect child =
+  `mouse_filter=IGNORE`): vertical drag steps row by row
+  (`_on_toc_scroll_gui_input` → `_step_band` → `scroll_to_item`; the pointer
+  `_band_item` persists across gestures; `SCROLL_SENSITIVITY` px of drag =
+  one `ROW_STEP`=56px of scroll).
+  **Search** (`_apply_filter`): rows hide unless the title matches (case-
+  insensitive) or they are an ancestor of a match; shown parents unfold;
+  clearing restores the default collapse state.
   **`SaveToggleButton`** (header, next to ✕): session-only no-save mode —
   `save_toggle_requested` → `reader._no_save`; amber `_counter_label.modulate`
   while active; `_render_current` guard `if not _peek and not _no_save`.

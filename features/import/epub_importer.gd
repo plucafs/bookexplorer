@@ -270,7 +270,8 @@ func _collect_paragraphs(
 	return out
 
 
-## Real TOC entries mapped to first-paragraph seqs: [{seq, title}, ...].
+## Real TOC entries mapped to first-paragraph seqs: [{seq, title, depth}, ...].
+## depth = nesting level (0 = top), pre-order (parent before children).
 ## Source: EPUB3 nav → EPUB2 NCX → none (empty: caller keeps fallback).
 func _collect_toc(
 	zip: ZIPReader, meta: Dictionary, paragraphs: Array[Dictionary]
@@ -300,19 +301,24 @@ func _collect_toc(
 		if not chapter_seq.has(href):
 			continue  # points at a file with no paragraphs
 		var seq := int(chapter_seq[href])
-		if seen.has(seq):
-			continue  # multiple navPoints into one file → first wins
-		seen[seq] = true
-		out.append({ "seq": seq, "title": title })
+		# Exact duplicates only: a fragment child of the same file keeps its
+		# row (seq|title differ) and jumps to the chapter start.
+		var key := "%d|%s" % [seq, title]
+		if seen.has(key):
+			continue
+		seen[key] = true
+		out.append({ "seq": seq, "title": title, "depth": int(entry.get("depth", 0)) })
 	return out
 
 
 ## EPUB3 nav: entries of the <nav epub:type="toc">, else the first <nav>.
 ## hrefs resolved relative to the nav file dir (base_dir), fragments stripped.
+## depth = <ol> nesting (0 = top level).
 func _parse_nav(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
 	var navs: Array[Array] = []
 	var toc_nav := -1
 	var current_nav := -1
+	var depth := 0  # <ol> nesting inside the current nav (0 = no ol yet)
 	var pending := {}
 	var parser := XMLParser.new()
 	if parser.open_buffer(bytes) != OK:
@@ -325,8 +331,11 @@ func _parse_nav(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
 				if name == "nav":
 					navs.append([])
 					current_nav = navs.size() - 1
+					depth = 0
 					if _attr(parser, "epub:type").to_lower().find("toc") != -1:
 						toc_nav = current_nav
+				elif name == "ol" and current_nav >= 0:
+					depth += 1
 				elif name == "a" and current_nav >= 0 and pending.is_empty():
 					var href := _attr(parser, "href")
 					if not href.is_empty():
@@ -340,10 +349,14 @@ func _parse_nav(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
 					navs[current_nav].append({
 						"title": str(pending["title"]).strip_edges(),
 						"href": _resolve_href(base_dir, str(pending["href"])),
+						"depth": maxi(0, depth - 1),
 					})
 					pending = {}
+				elif end_name == "ol":
+					depth = maxi(0, depth - 1)
 				elif end_name == "nav":
 					current_nav = -1
+					depth = 0
 	var chosen := toc_nav
 	if chosen < 0 and not navs.is_empty():
 		chosen = 0
@@ -357,6 +370,7 @@ func _parse_nav(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
 
 ## EPUB2 NCX: navPoints in start order (a parent before its children).
 ## content src relative to the NCX file dir (base_dir), fragments stripped.
+## depth = open navPoint nesting (0 = top level), captured before the push.
 func _parse_ncx(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var stack: Array[int] = []  # indices into out of the open navPoints
@@ -369,7 +383,7 @@ func _parse_ncx(bytes: PackedByteArray, base_dir: String) -> Array[Dictionary]:
 			XMLParser.NODE_ELEMENT:
 				var name := _local(parser.get_node_name())
 				if name == "navpoint":
-					out.append({ "title": "", "href": "" })
+					out.append({ "title": "", "href": "", "depth": stack.size() })
 					stack.append(out.size() - 1)
 					if parser.is_empty():
 						stack.pop_back()
@@ -536,8 +550,8 @@ func _persist(
 			break
 		var entry: Dictionary = toc_rows[i]
 		ok = db.query_with_bindings(
-			"INSERT INTO toc_entries (book_id, seq, title) VALUES (?, ?, ?);",
-			[book_id, int(entry["seq"]), str(entry["title"])]
+			"INSERT INTO toc_entries (book_id, seq, title, depth) VALUES (?, ?, ?, ?);",
+			[book_id, int(entry["seq"]), str(entry["title"]), int(entry.get("depth", 0))]
 		)
 
 	if not ok:

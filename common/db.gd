@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS toc_entries (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	book_id TEXT NOT NULL,
 	seq INTEGER NOT NULL,
-	title TEXT NOT NULL
+	title TEXT NOT NULL,
+	depth INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -74,7 +75,22 @@ static func open_connection(path: String = DB_PATH) -> SQLite:
 		push_error("Db: schema failed — %s" % db.error_message)
 		db.close_db()
 		return null
+	_migrate(db)
 	return db
+
+
+## Column additions for databases created by older builds (CREATE TABLE
+## IF NOT EXISTS never alters an existing table).
+static func _migrate(db: SQLite) -> void:
+	if not db.query("PRAGMA table_info(toc_entries);"):
+		push_error("Db: toc_entries migration check failed — %s" % db.error_message)
+		return
+	for row: Dictionary in db.query_result:
+		if str(row.get("name", "")) == "depth":
+			return
+	# Nested TOC: pre-existing rows keep depth 0 (flat) until re-import.
+	if not db.query("ALTER TABLE toc_entries ADD COLUMN depth INTEGER NOT NULL DEFAULT 0;"):
+		push_error("Db: toc_entries depth migration failed — %s" % db.error_message)
 
 
 func get_setting(key: String) -> String:
@@ -282,12 +298,13 @@ func get_bookmarked_paragraphs(book_id: String) -> Array[Dictionary]:
 ## Table of contents: [{title, seq}] in reading order.
 ## Titles come from the epub nav/NCX (toc_entries, imported); books imported
 ## before that (or with no nav/NCX) fall back to chapter href basenames.
+## Entries: {title, seq, depth} — depth = nesting level (0 = top).
 func get_toc(book_id: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if _db == null:
 		return out
 	if not _db.query_with_bindings(
-		"SELECT seq, title FROM toc_entries WHERE book_id = ? ORDER BY seq ASC, id ASC;",
+		"SELECT seq, title, depth FROM toc_entries WHERE book_id = ? ORDER BY seq ASC, id ASC;",
 		[book_id]
 	):
 		push_error("Db.get_toc: %s" % _db.error_message)
@@ -297,6 +314,7 @@ func get_toc(book_id: String) -> Array[Dictionary]:
 			out.append({
 				"title": str(row.get("title", "")),
 				"seq": int(row.get("seq", 0)),
+				"depth": int(row.get("depth", 0)),
 			})
 		return out
 	# Fallback: one entry per distinct chapter href, display-ready titles.
@@ -312,6 +330,7 @@ func get_toc(book_id: String) -> Array[Dictionary]:
 		out.append({
 			"title": title if not title.is_empty() else "—",
 			"seq": int(row.get("seq", 0)),
+			"depth": 0,
 		})
 	return out
 
