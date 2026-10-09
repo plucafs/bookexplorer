@@ -10,6 +10,7 @@ resource_name = "StyleBoxEmpty"
 resource_name = "StyleBoxEmpty"
 
 [node name="Toc" type="Control" unique_id=213129947]
+visible = false
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
