@@ -498,7 +498,14 @@ func _on_pinch_close() -> void:
 		_bookmark_paragraphs = list
 		_paragraphs = list
 		_seq = clampi(_seq, 0, _paragraphs.size() - 1)
-	_render_current()  # refresh ★ (no last_seq write while peek/bookmark)
+	# Same paragraph after the toggle → keep the in-place reading position.
+	# Kill the rubber-band snap-back first: a pinch can start while its tween
+	# still runs, and the tween would stomp the restored position.
+	var scroll := 0.0
+	if int(_paragraphs[_seq].get("seq", -1)) == db_seq:
+		_kill_scroll_tween()
+		scroll = -_active_text.position.y
+	_render_current(scroll)  # refresh ★ (no last_seq write while peek/bookmark)
 
 
 ## Pinch open (fingers apart): show the paragraph inside the full book
@@ -912,11 +919,14 @@ func _snap_back() -> void:
 	_tween.finished.connect(func() -> void: _tween = null)
 
 
-func _render_current() -> void:
+## Renders the current row. p_scroll keeps the in-place text scroll
+## (0 = top): pass it when re-rendering the SAME paragraph (e.g. the
+## bookmark ★ refresh), so the reading position survives.
+func _render_current(p_scroll: float = 0.0) -> void:
 	var row: Dictionary = _paragraphs[_seq]
 	_active_text.text = str(row["text"])
-	_reset_label(_active_text)
-	_schedule_reset(_active_text)
+	_reset_label(_active_text, p_scroll)
+	_schedule_reset(_active_text, p_scroll)
 	if _feed_mode:
 		# Feed: the paragraph's book title, counter = steps taken,
 		# no progress and no last_seq persistence.
@@ -956,10 +966,11 @@ func _render_current() -> void:
 		Db.set_setting(Db.seq_key(book_id), str(_seq))
 
 
-## Label height = full content + the focus margin; scroll zeroed (top).
-func _reset_label(label: Label) -> void:
+## Label height = full content + the focus margin; scroll restored and
+## clamped to the legal range (scroll 0 = top).
+func _reset_label(label: Label, scroll: float = 0.0) -> void:
 	label.size.y = label.get_minimum_size().y + _focus_margin(label)
-	label.position.y = 0.0
+	label.position.y = clampf(-scroll, -_overflow_of(label), 0.0)
 
 
 ## Empty space under the text: at max scroll the last line lands on the
@@ -975,9 +986,9 @@ func _focus_margin(label: Label) -> float:
 
 ## Post-layout re-sync: the autowrap min-height with a width not yet
 ## assigned is computed wrong (doubled height) — recalculating on later
-## frames fixes size.y to the real value.
-func _schedule_reset(label: Label) -> void:
-	_reset_label.bind(label).call_deferred()
+## frames fixes size.y to the real value (same scroll, re-clamped).
+func _schedule_reset(label: Label, scroll: float = 0.0) -> void:
+	_reset_label.bind(label, scroll).call_deferred()
 
 
 ## How much of the text exceeds the visible window (0 = it all fits).

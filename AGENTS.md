@@ -186,7 +186,11 @@ unfiltered fallback attempt for short-only books), `delete_book(id)` (transactio
   `_pinch_consumed` (gesture eaten once). **Pinch closed** → `Db.toggle_bookmark`
   on the current paragraph (not in feed mode: **also in feed**, ` ★` feedback on
   the chapter label/title); in bookmark mode a removal rebuilds the list
-  (empty → library). **Pinch open** → in bookmark mode: peek into
+  (empty → library). **The toggle keeps the in-place paragraph scroll**:
+  `_render_current(p_scroll)` → `_reset_label/_schedule_reset(label, scroll)`
+  clamp-restore (also after the deferred layout reset) when the row is
+  unchanged — `_kill_scroll_tween()` first, a pinch can start mid snap-back;
+  a rebuild that changes the row resets to top as before. **Pinch open** → in bookmark mode: peek into
   `_all_paragraphs` at that seq (`_peek=true`, `_bookmark_mode=false`,
   `_bookmark_return_seq` saved); **in feed mode** → `_open_feed_context()`:
   loads `Db.get_paragraphs(row.book_id)`, saves `_feed_history`/`_feed_seq`,
