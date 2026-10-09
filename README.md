@@ -7,6 +7,7 @@ An Android epub reader and explorer
 - Bookmark paragraphs and scroll through them
 - Reading gestures
 	- Scroll: scroll back and forward to change paragraph
+	- Long tap: on paragraph, starts auto scrolling
 	- Double tap: go back to library
 	- Pinch in: toggle bookmark for the current paragraph
 	- Pinch out (bookmark/feed): go to the paragraph in context
